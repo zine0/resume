@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+﻿/* eslint-disable @next/next/no-img-element */
 "use client"
 
 import { useLayoutEffect, useRef, useState } from "react"
@@ -17,43 +17,12 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
   const isAsciiOnly = (str: string | undefined) => !!str && /^[\x00-\x7F]+$/.test(str);
   const leftRef = useRef<HTMLDivElement | null>(null);
   const rightRef = useRef<HTMLDivElement | null>(null);
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const personalGridRef = useRef<HTMLDivElement | null>(null);
   const [rightBoxHeight, setRightBoxHeight] = useState<number | undefined>(undefined);
+  const [stretchRowGapPx, setStretchRowGapPx] = useState<number | undefined>(undefined);
+  const [idPhotoHeight, setIdPhotoHeight] = useState<number | undefined>(undefined);
 
-  useLayoutEffect(() => {
-    if (!leftRef.current) return;
-    const el = leftRef.current;
-    const measure = () => {
-      const rect = el.getBoundingClientRect();
-      const h = Math.max(0, rect.height || el.scrollHeight || 0);
-      setRightBoxHeight(h);
-    };
-    // 初次 + 多轮调度，确保收缩场景也能捕获（如列数减少、模块隐藏）
-    measure();
-    const raf = requestAnimationFrame(measure);
-    const t1 = setTimeout(measure, 0);
-    const t2 = setTimeout(measure, 60);
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : undefined;
-    if (ro) ro.observe(el);
-    const mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(() => requestAnimationFrame(measure)) : undefined;
-    if (mo) mo.observe(el, { subtree: true, childList: true, characterData: true, attributes: true });
-    window.addEventListener('resize', measure);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(t1);
-      clearTimeout(t2);
-      if (ro) ro.disconnect();
-      if (mo) mo.disconnect();
-      window.removeEventListener('resize', measure);
-    };
-  }, [
-    resumeData.centerTitle,
-    resumeData.title,
-    resumeData.personalInfoSection?.layout?.mode,
-    resumeData.personalInfoSection?.layout?.itemsPerRow,
-    resumeData.personalInfoSection?.personalInfo?.length,
-    resumeData.jobIntentionSection?.enabled,
-    resumeData.jobIntentionSection?.items?.length,
-  ]);
   // 等高策略：测量左侧真实高度，设置右侧容器高度；
   // 父容器使用 items-start，避免 items-stretch 与右侧固定高度形成“锁高”导致头像不随左侧收缩。
   // 格式化求职意向显示
@@ -80,6 +49,13 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
   const jobIntentionText = formatJobIntention();
   const avatarType = resumeData.personalInfoSection?.avatarType === "idPhoto" ? "idPhoto" : "default";
   const isIdPhoto = avatarType === "idPhoto";
+  const hasIdPhotoHeader = !!(resumeData.avatar && !resumeData.centerTitle && isIdPhoto);
+  const personalInfo = (resumeData.personalInfoSection?.personalInfo || [])
+    .slice()
+    .sort((a, b) => a.order - b.order);
+  const layoutMode = resumeData.personalInfoSection?.layout?.mode ?? "grid";
+  const itemsPerRow = resumeData.personalInfoSection?.layout?.itemsPerRow || 2;
+  const isInline = layoutMode === "inline";
   const avatarShape = isIdPhoto ? "square" : (resumeData.personalInfoSection?.avatarShape === "square" ? "square" : "circle");
   const avatarShapeClasses =
     avatarShape === "square" ? "rounded-none avatar-square" : "rounded-full";
@@ -90,6 +66,89 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
   const headerAlignClass = resumeData.centerTitle
     ? 'flex-col items-center'
     : 'justify-between items-start';
+  const shouldDistribute = hasIdPhotoHeader;
+  const shouldStretchPersonalInfo =
+    shouldDistribute &&
+    !isInline &&
+    !jobIntentionText &&
+    personalInfo.length > 0;
+  const personalInfoRowCount = !isInline && personalInfo.length > 0
+    ? Math.ceil(personalInfo.length / itemsPerRow)
+    : 0;
+  const effectiveStretchGap = shouldStretchPersonalInfo
+    ? (stretchRowGapPx ?? 0)
+    : 0;
+  const rowGapRem = 0.5;
+
+  useLayoutEffect(() => {
+    if (!leftRef.current) return;
+    const el = leftRef.current;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      const h = Math.max(0, rect.height || el.scrollHeight || 0);
+      setRightBoxHeight(h);
+
+      if (!shouldStretchPersonalInfo || !titleRef.current || !personalGridRef.current || personalInfoRowCount === 0) {
+        if (stretchRowGapPx !== undefined) {
+          setStretchRowGapPx(undefined);
+        }
+        return;
+      }
+
+      const avatarHeight = rightRef.current?.getBoundingClientRect().height || 0;
+      if (avatarHeight > 0) {
+        if (idPhotoHeight === undefined || Math.abs(avatarHeight - idPhotoHeight) > 0.5) {
+          setIdPhotoHeight(avatarHeight);
+        }
+      } else if (idPhotoHeight !== undefined) {
+        setIdPhotoHeight(undefined);
+      }
+      const targetHeight = avatarHeight > 0 ? avatarHeight : h;
+      const titleHeight = titleRef.current.getBoundingClientRect().height || 0;
+      const gridRect = personalGridRef.current.getBoundingClientRect();
+      const currentGap = stretchRowGapPx ?? 0;
+      const contentHeight = Math.max(0, gridRect.height - currentGap * personalInfoRowCount);
+      const available = Math.max(0, targetHeight - titleHeight);
+      const nextGap = Math.max(0, (available - contentHeight) / personalInfoRowCount);
+
+      if (Number.isFinite(nextGap) && Math.abs(nextGap - currentGap) > 0.5) {
+        setStretchRowGapPx(nextGap);
+      }
+    };
+    // 初次 + 多轮调度，确保收缩场景也能捕获（如列数减少、模块隐藏）
+    measure();
+    const raf = requestAnimationFrame(measure);
+    const t1 = setTimeout(measure, 0);
+    const t2 = setTimeout(measure, 60);
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : undefined;
+    if (ro) {
+      ro.observe(el);
+      if (rightRef.current) ro.observe(rightRef.current);
+    }
+    const mo = typeof MutationObserver !== 'undefined' ? new MutationObserver(() => requestAnimationFrame(measure)) : undefined;
+    if (mo) mo.observe(el, { subtree: true, childList: true, characterData: true, attributes: true });
+    window.addEventListener('resize', measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      if (ro) ro.disconnect();
+      if (mo) mo.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [
+    resumeData.centerTitle,
+    resumeData.title,
+    resumeData.personalInfoSection?.layout?.mode,
+    resumeData.personalInfoSection?.layout?.itemsPerRow,
+    resumeData.personalInfoSection?.personalInfo?.length,
+    resumeData.jobIntentionSection?.enabled,
+    resumeData.jobIntentionSection?.items?.length,
+    shouldStretchPersonalInfo,
+    personalInfoRowCount,
+    stretchRowGapPx,
+    idPhotoHeight,
+  ]);
 
   return (
     <div className="resume-preview resume-content">
@@ -109,9 +168,13 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
 
         <div
           ref={leftRef}
-          className={`flex-1 flex flex-col resume-header-left ${resumeData.avatar && !resumeData.centerTitle && isIdPhoto ? "is-id-photo self-stretch" : ""} ${resumeData.centerTitle ? 'w-full' : ''}`}
+          className={`flex-1 flex flex-col resume-header-left ${shouldDistribute ? "is-id-photo id-photo-distribute" : ""} ${resumeData.centerTitle ? 'w-full' : ''}`}
+          style={shouldStretchPersonalInfo ? { justifyContent: 'flex-start', minHeight: idPhotoHeight } : undefined}
         >
-          <h1 className={`resume-title text-2xl font-bold text-foreground mb-4 ${resumeData.centerTitle ? 'text-center' : ''}`}>
+          <h1
+            ref={titleRef}
+            className={`resume-title text-2xl font-bold text-foreground ${shouldStretchPersonalInfo ? 'mb-0' : 'mb-4'} ${resumeData.centerTitle ? 'text-center' : ''}`}
+          >
             {resumeData.title || "简历标题"}
           </h1>
 
@@ -123,13 +186,104 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
           )}
 
           {/* 个人信息 */}
-          {(resumeData.personalInfoSection?.layout?.mode === 'inline') ? (
-            /* 单行显示模式（inline） */
+          {shouldDistribute ? (
+            isInline ? (
+              <div
+                className="personal-info personal-info-row flex items-center justify-between w-full whitespace-nowrap"
+                style={{ backgroundColor: '#F5F6F8', padding: '8px 12px', borderRadius: '4px' }}
+              >
+                {personalInfo.map((item) => (
+                  <div
+                    key={item.id}
+                    className="personal-info-item flex items-center gap-0.5 shrink-0 whitespace-nowrap"
+                  >
+                    {item.icon && (
+                      <svg
+                        className="resume-icon w-[1em] h-[1em] shrink-0"
+                        fill="black"
+                        viewBox="0 0 24 24"
+                        dangerouslySetInnerHTML={{ __html: item.icon }}
+                      />
+                    )}
+                    {resumeData.personalInfoSection?.showPersonalInfoLabels !== false && (
+                      <span className="text-sm leading-none text-muted-foreground shrink-0">{item.label}{'：'}</span>
+                    )}
+                    {item.value.type === "link" && item.value.content ? (
+                      <a
+                        href={item.value.content}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`text-sm leading-none text-blue-600 hover:text-blue-800 hover:underline ${isAsciiOnly(item.value.title || item.value.content) ? 'font-latin' : ''}`}
+                      >
+                        {item.value.title || "点击访问"}
+                      </a>
+                    ) : (
+                      <span className={`text-sm leading-none text-foreground ${isAsciiOnly(item.value.content) ? 'font-latin' : ''}`}>{item.value.content || "未填写"}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                className="personal-info-stretch-wrapper w-full"
+                style={shouldStretchPersonalInfo ? { minHeight: 0 } : undefined}
+              >
+                <div
+                  ref={personalGridRef}
+                  className="personal-info-row personal-info-grid w-full whitespace-nowrap"
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: `repeat(${itemsPerRow}, max-content)`,
+                    justifyContent: 'space-between',
+                    justifyItems: 'start',
+                    alignItems: 'center',
+                    columnGap: 0,
+                    rowGap: shouldStretchPersonalInfo ? `${effectiveStretchGap}px` : `${rowGapRem}rem`,
+                    alignContent: 'start',
+                    paddingTop: shouldStretchPersonalInfo ? `${effectiveStretchGap}px` : undefined,
+                    boxSizing: shouldStretchPersonalInfo ? 'border-box' : undefined,
+                    width: '100%',
+                  }}
+                >
+                  {personalInfo.map((item) => (
+                    <div
+                      key={item.id}
+                      className="personal-info-item inline-flex items-center gap-0.5 whitespace-nowrap"
+                    >
+                      {item.icon && (
+                        <svg
+                          className="resume-icon w-[1em] h-[1em] flex-shrink-0"
+                          fill="black"
+                          viewBox="0 0 24 24"
+                          dangerouslySetInnerHTML={{ __html: item.icon }}
+                        />
+                      )}
+                      {resumeData.personalInfoSection?.showPersonalInfoLabels !== false && (
+                        <span className="text-sm leading-none text-muted-foreground flex-shrink-0">{item.label}{'：'}</span>
+                      )}
+                      {item.value.type === "link" && item.value.content ? (
+                        <a
+                          href={item.value.content}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`text-sm leading-none text-blue-600 hover:text-blue-800 hover:underline ${isAsciiOnly(item.value.title || item.value.content) ? 'font-latin' : ''}`}
+                        >
+                          {item.value.title || "点击访问"}
+                        </a>
+                      ) : (
+                        <span className={`text-sm leading-none text-foreground ${isAsciiOnly(item.value.content) ? 'font-latin' : ''}`}>{item.value.content || "未填写"}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          ) : isInline ? (
             <div
               className="personal-info flex items-center justify-between w-full whitespace-nowrap"
               style={{ backgroundColor: '#F5F6F8', padding: '8px 12px', borderRadius: '4px' }}
             >
-              {resumeData.personalInfoSection?.personalInfo.map((item) => (
+              {personalInfo.map((item) => (
                 <div
                   key={item.id}
                   className="personal-info-item flex items-center gap-0.5 shrink-0 whitespace-nowrap"
@@ -143,7 +297,7 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
                     />
                   )}
                   {resumeData.personalInfoSection?.showPersonalInfoLabels !== false && (
-                    <span className="text-sm leading-none text-muted-foreground shrink-0">{item.label}：</span>
+                    <span className="text-sm leading-none text-muted-foreground shrink-0">{item.label}{'：'}</span>
                   )}
                   {item.value.type === "link" && item.value.content ? (
                     <a
@@ -161,12 +315,7 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
               ))}
             </div>
           ) : (
-            /* 多行显示：使用 CSS Grid 统一列轨道 + 两端对齐（不换行，必要时省略） */
             (() => {
-              const itemsPerRow = resumeData.personalInfoSection?.layout?.itemsPerRow || 2;
-              const rowGapRem = 0.5; // 行间距
-              const personalInfo = resumeData.personalInfoSection?.personalInfo || [];
-
               return (
                 <div
                   className="personal-info personal-info-grid"
@@ -195,7 +344,7 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
                         />
                       )}
                       {resumeData.personalInfoSection?.showPersonalInfoLabels !== false && (
-                        <span className="text-sm leading-none text-muted-foreground flex-shrink-0">{item.label}：</span>
+                        <span className="text-sm leading-none text-muted-foreground flex-shrink-0">{item.label}{'：'}</span>
                       )}
                       {item.value.type === "link" && item.value.content ? (
                         <a
