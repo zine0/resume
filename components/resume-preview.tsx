@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client"
 
-import React, { useLayoutEffect, useRef, useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import { Icon } from "@iconify/react"
 import type { ResumeData } from "@/types/resume"
 import RichTextRenderer from "./rich-text-renderer"
@@ -78,10 +78,20 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
   };
 
   const jobIntentionText = formatJobIntention();
-  const avatarShape = resumeData.personalInfoSection?.avatarShape === "square" ? "square" : "circle";
+  const avatarType = resumeData.personalInfoSection?.avatarType === "idPhoto" ? "idPhoto" : "default";
+  const isIdPhoto = avatarType === "idPhoto";
+  const avatarShape = isIdPhoto ? "square" : (resumeData.personalInfoSection?.avatarShape === "square" ? "square" : "circle");
   const avatarShapeClasses =
     avatarShape === "square" ? "rounded-none avatar-square" : "rounded-full";
-  const rightAvatarStyle = rightBoxHeight ? { width: rightBoxHeight, height: rightBoxHeight } : undefined;
+  const idPhotoRatio = 5 / 7;
+  const baseAvatarStyle = isIdPhoto
+    ? { width: "5rem", height: "7rem" }
+    : { width: "5rem", height: "5rem" };
+  const rightAvatarStyle = rightBoxHeight
+    ? (isIdPhoto
+      ? { height: rightBoxHeight, width: rightBoxHeight * idPhotoRatio }
+      : { width: rightBoxHeight, height: rightBoxHeight })
+    : baseAvatarStyle;
 
   return (
     <div className="resume-preview resume-content">
@@ -93,7 +103,8 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
             <img
               src={resumeData.avatar}
               alt="头像"
-              className={`resume-avatar w-20 h-20 ${avatarShapeClasses} object-cover border-2 border-border box-border mx-auto`}
+              className={`resume-avatar ${avatarShapeClasses} object-cover border-2 border-border box-border mx-auto`}
+              style={baseAvatarStyle}
             />
           </div>
         )}
@@ -208,7 +219,7 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
             <img
               src={resumeData.avatar}
               alt="头像"
-              className={`resume-avatar w-20 h-20 ${avatarShapeClasses} object-cover border-2 border-border box-border`}
+              className={`resume-avatar ${avatarShapeClasses} object-cover border-2 border-border box-border`}
               style={rightAvatarStyle}
             />
           </div>

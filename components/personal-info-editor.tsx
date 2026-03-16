@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 /* eslint-disable @next/next/no-img-element */
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,9 @@ export default function PersonalInfoEditor({
   const avatarUrl = avatar || "";
   const showLabels = personalInfoSection?.showPersonalInfoLabels !== false;
   const layout: PersonalInfoLayout = personalInfoSection?.layout ?? { mode: 'grid', itemsPerRow: 2 };
-  const avatarShape = personalInfoSection?.avatarShape === "square" ? "square" : "circle";
+  const avatarType = personalInfoSection?.avatarType === "idPhoto" ? "idPhoto" : "default";
+  const isIdPhoto = avatarType === "idPhoto";
+  const avatarShape = isIdPhoto ? "square" : (personalInfoSection?.avatarShape === "square" ? "square" : "circle");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 提取personalInfo到局部变量以简化代码，如果personalInfoSection不存在则使用空数组
@@ -117,11 +119,23 @@ export default function PersonalInfoEditor({
    * 切换头像显示风格（圆形 / 方形）
    */
   const toggleAvatarShape = () => {
-    if (!personalInfoSection) return;
+    if (!personalInfoSection || isIdPhoto) return;
     const newShape = avatarShape === "circle" ? "square" : "circle";
     onUpdate({
       ...personalInfoSection,
       avatarShape: newShape,
+    });
+  };
+
+  const handleAvatarTypeChange = (value: "default" | "idPhoto") => {
+    if (!personalInfoSection) return;
+    const nextShape = value === "idPhoto"
+      ? "square"
+      : (personalInfoSection.avatarShape === "square" ? "square" : "circle");
+    onUpdate({
+      ...personalInfoSection,
+      avatarType: value,
+      avatarShape: nextShape,
     });
   };
 
@@ -250,11 +264,24 @@ export default function PersonalInfoEditor({
           <h2 className="section-title">个人信息</h2>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Select
+            value={avatarType}
+            onValueChange={(value) => handleAvatarTypeChange(value as "default" | "idPhoto")}
+          >
+            <SelectTrigger className="h-9 w-28">
+              <SelectValue placeholder="头像类型" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">普通头像</SelectItem>
+              <SelectItem value="idPhoto">一寸照片</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             size="sm"
             variant="outline"
             onClick={toggleAvatarShape}
             className="gap-2 bg-transparent"
+            disabled={isIdPhoto}
           >
             <Icon
               icon={avatarShape === "circle" ? "mdi:checkbox-blank-circle-outline" : "mdi:checkbox-blank-outline"}
@@ -348,7 +375,7 @@ export default function PersonalInfoEditor({
                 className="mb-2 placeholder:text-gray-400 border border-border"
               />
               <p className="text-xs text-gray-400 pl-3">
-                建议使用1:1比例的图片
+                {isIdPhoto ? "一寸照片模式：固定方形显示，不支持圆形头像。" : "建议使用1:1比例的图片"}
               </p>
             </div>
           </div>
@@ -394,7 +421,7 @@ export default function PersonalInfoEditor({
               icon="mdi:information-outline"
               className="w-8 h-8 mx-auto mb-2 opacity-50"
             />
-            <p className="text-sm">暂无个人信息，点击"添加信息"开始编辑</p>
+            <p className="text-sm">暂无个人信息，点击“添加信息”开始编辑</p>
           </div>
         )}
       </div>

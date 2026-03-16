@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ResumeData } from "@/types/resume";
@@ -58,6 +58,19 @@ async function generateServerPdf(resumeData: ResumeData): Promise<Blob> {
 
 export type Mode = "loading" | "server" | "fallback";
 
+function normalizeResumeDataForAvatar(resumeData: ResumeData): ResumeData {
+  const section = resumeData.personalInfoSection;
+  if (!section || section.avatarType !== "idPhoto") return resumeData;
+  if (section.avatarShape === "square") return resumeData;
+  return {
+    ...resumeData,
+    personalInfoSection: {
+      ...section,
+      avatarShape: "square",
+    },
+  };
+}
+
 export function PDFViewer({
   resumeData,
   onModeChange,
@@ -73,8 +86,8 @@ export function PDFViewer({
   renderNotice?: "internal" | "external";
   /**
    * （可选）覆盖服务器生成 PDF 时使用的文件名路径片段。
-   * 当外部容器本身位于 /pdf/preview/[filename] 这样的语义路由时，
-   * 传入同名可保证服务端与 URL 文件名一致。
+   * 当外部容器本身位于 /pdf/preview/[filename] 这样的语义路径时，
+   * 传入同名可保证服务端 URL 文件名一致。
    */
   serverFilename?: string;
 }) {
@@ -82,7 +95,11 @@ export function PDFViewer({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hasServerPdfRef = useRef(false);
-  const resumeKey = useMemo(() => JSON.stringify(resumeData), [resumeData]);
+  const normalizedResumeData = useMemo(
+    () => normalizeResumeDataForAvatar(resumeData),
+    [resumeData]
+  );
+  const resumeKey = useMemo(() => JSON.stringify(normalizedResumeData), [normalizedResumeData]);
   const genIdRef = useRef(0);
 
   useEffect(() => {
@@ -197,7 +214,7 @@ export function PDFViewer({
   if (mode === "server") {
     if (renderNotice === "external") {
       // 已触发导航到浏览器内置 PDF 查看器，这里展示一个轻量过渡状态（极短时间可见）
-      return <PdfLoading message="正在打开浏览器 PDF 查看器…" />;
+      return <PdfLoading message="正在打开浏览器 PDF 查看器..." />;
     }
     return (
       <object data={pdfUrl || undefined} type="application/pdf" width="100%" height="100%" style={{ border: "none" }}>
@@ -243,7 +260,7 @@ export function PDFViewer({
         </div>
       )}
       <div className="pdf-preview-mode">
-        <ResumePreview resumeData={resumeData} />
+        <ResumePreview resumeData={normalizedResumeData} />
       </div>
     </div>
   );
@@ -264,13 +281,14 @@ export function PDFDownloadLink({
     e.preventDefault();
     if (loading) return;
     setLoading(true);
+    const normalized = normalizeResumeDataForAvatar(resumeData);
     try {
       const available = FORCE_PRINT ? false : await checkServerPdfAvailable();
       if (!available) {
-        alert("服务器生成不可用，请使用‘打印/保存为 PDF’，并在对话框中关闭页眉页脚、勾选背景图形。");
+        alert("服务器生成不可用，请使用“打印/保存为 PDF”，并在对话框中关闭页眉页脚、勾选背景图形。");
         return;
       }
-      const blob = await generateServerPdf(resumeData);
+      const blob = await generateServerPdf(normalized);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -302,3 +320,4 @@ export function PDFDownloadLink({
 }
 
 export default PDFViewer;
+

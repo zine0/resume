@@ -46,6 +46,7 @@ export interface PersonalInfoSection {
   showPersonalInfoLabels?: boolean
   /** 头像显示风格：circle 圆形，square 方形 */
   avatarShape?: 'circle' | 'square'
+  avatarType?: 'default' | 'idPhoto'
   /** 个人信息布局配置 */
   layout: PersonalInfoLayout
 }
