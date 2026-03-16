@@ -75,10 +75,20 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
   const personalInfoRowCount = !isInline && personalInfo.length > 0
     ? Math.ceil(personalInfo.length / itemsPerRow)
     : 0;
+  const isMultiRowPersonalInfo = !isInline && personalInfoRowCount > 1;
+  const shouldStyleJobIntention = !!jobIntentionText && isMultiRowPersonalInfo;
   const effectiveStretchGap = shouldStretchPersonalInfo
     ? (stretchRowGapPx ?? 0)
     : 0;
   const rowGapRem = 0.5;
+  const jobIntentionStyle = shouldStyleJobIntention
+    ? {
+      backgroundColor: "#F5F6F8",
+      padding: "4px 8px",
+      borderRadius: "4px",
+      display: "inline-block",
+    }
+    : undefined;
 
   useLayoutEffect(() => {
     if (!leftRef.current) return;
@@ -180,7 +190,10 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
 
           {/* 求职意向 */}
           {jobIntentionText && (
-            <div className={`job-intention-line text-sm text-muted-foreground mb-3 ${resumeData.centerTitle ? 'text-center' : ''}`}>
+            <div
+              className={`job-intention-line text-sm text-muted-foreground mb-3 ${resumeData.centerTitle ? 'text-center' : ''}`}
+              style={jobIntentionStyle}
+            >
               {jobIntentionText}
             </div>
           )}
