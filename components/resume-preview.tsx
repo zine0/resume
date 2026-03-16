@@ -204,7 +204,7 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
 
         {/* 头像：左右布局时放在右侧，并在父容器高度内垂直居中 */}
         {resumeData.avatar && !resumeData.centerTitle && (
-          <div ref={rightRef} className="ml-6 flex items-start shrink-0">
+          <div ref={rightRef} className="ml-6 flex items-start shrink-0 resume-avatar-wrapper">
             <img
               src={resumeData.avatar}
               alt="头像"

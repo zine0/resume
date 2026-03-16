@@ -104,7 +104,7 @@
   .personal-info-item {
     display: inline-flex !important;
     align-items: center !important;
-    column-gap: 3pt !important;
+    column-gap: 2pt !important;
     margin-right: 0 !important;
     margin-bottom: 3pt !important;
     font-size: 10pt !important;
@@ -139,12 +139,17 @@
     border-radius: 0 !important;
   }
 
+  .resume-avatar-wrapper {
+    margin-left: 12px !important;
+  }
+
   /* 图标在打印时的处理：使图标高度与文本高度一致 */
   .resume-icon {
     width: 1em !important;
     height: 1em !important;
-    margin-right: 3pt !important;
+    margin-right: 0 !important;
     vertical-align: middle !important;
+    display: block !important;
     color: #333 !important;
   }
 
@@ -385,8 +390,10 @@
 .pdf-preview-mode .personal-info-item {
   font-size: 10pt;
   color: #000;
-  margin-right: 15pt;
+  margin-right: 8pt;
   margin-bottom: 3pt;
+  column-gap: 2pt;
+  align-items: center;
 }
 
 .pdf-preview-mode .personal-info-grid {
@@ -404,8 +411,13 @@
 .pdf-preview-mode .resume-icon {
   width: 1em;
   height: 1em;
-  margin-right: 3pt;
+  margin-right: 0;
+  display: block;
   color: #333;
+}
+
+.pdf-preview-mode .resume-avatar-wrapper {
+  margin-left: 12px;
 }
 
 .pdf-preview-mode .module-content {
