@@ -19,9 +19,14 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
   const rightRef = useRef<HTMLDivElement | null>(null);
   const titleRef = useRef<HTMLHeadingElement | null>(null);
   const personalGridRef = useRef<HTMLDivElement | null>(null);
+  const jobIntentionWrapRef = useRef<HTMLDivElement | null>(null);
+  const jobIntentionBadgeRef = useRef<HTMLSpanElement | null>(null);
+  const jobIntentionTextRef = useRef<HTMLSpanElement | null>(null);
   const [rightBoxHeight, setRightBoxHeight] = useState<number | undefined>(undefined);
   const [stretchRowGapPx, setStretchRowGapPx] = useState<number | undefined>(undefined);
   const [idPhotoHeight, setIdPhotoHeight] = useState<number | undefined>(undefined);
+  const [jobIntentionScale, setJobIntentionScale] = useState<number>(1);
+  const [jobIntentionFontScale, setJobIntentionFontScale] = useState<number>(1);
 
   // 等高策略：测量左侧真实高度，设置右侧容器高度；
   // 父容器使用 items-start，避免 items-stretch 与右侧固定高度形成“锁高”导致头像不随左侧收缩。
@@ -81,12 +86,27 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
     ? (stretchRowGapPx ?? 0)
     : 0;
   const rowGapRem = 0.5;
-  const jobIntentionStyle = shouldStyleJobIntention
+  const jobIntentionBadgeStyle = {
+    backgroundColor: shouldStyleJobIntention ? "#F5F6F8" : undefined,
+    padding: shouldStyleJobIntention ? "4px 8px" : undefined,
+    borderRadius: shouldStyleJobIntention ? "4px" : undefined,
+    display: "block",
+    width: "100%",
+    boxSizing: "border-box" as const,
+  };
+  const jobIntentionWrapStyle = jobIntentionText
     ? {
-      backgroundColor: "#F5F6F8",
-      padding: "4px 8px",
-      borderRadius: "4px",
+      width: "100%",
+      whiteSpace: "nowrap" as const,
+      overflow: "hidden",
+    }
+    : undefined;
+  const jobIntentionTextStyle = jobIntentionText
+    ? {
+      transform: `scaleX(${jobIntentionScale})`,
+      transformOrigin: `${resumeData.centerTitle ? "center" : "left"} center`,
       display: "inline-block",
+      fontSize: `${jobIntentionFontScale}em`,
     }
     : undefined;
 
@@ -124,6 +144,43 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
       if (Number.isFinite(nextGap) && Math.abs(nextGap - currentGap) > 0.5) {
         setStretchRowGapPx(nextGap);
       }
+
+      if (jobIntentionBadgeRef.current && jobIntentionTextRef.current) {
+        const badgeWidth = jobIntentionBadgeRef.current.clientWidth || 0;
+        const computed = getComputedStyle(jobIntentionBadgeRef.current);
+        const paddingLeft = Number.parseFloat(computed.paddingLeft) || 0;
+        const paddingRight = Number.parseFloat(computed.paddingRight) || 0;
+        const wrapWidth = Math.max(0, badgeWidth - paddingLeft - paddingRight);
+        const textWidth = jobIntentionTextRef.current.scrollWidth || 0;
+        if (wrapWidth > 0 && textWidth > 0) {
+          const baseWidth = textWidth / Math.max(0.01, jobIntentionFontScale);
+          const desiredScale = Math.min(1, wrapWidth / baseWidth);
+          const minFontScale = 0.92;
+          let nextFontScale = 1;
+          let nextScaleX = 1;
+
+          if (desiredScale >= 1) {
+            nextFontScale = 1;
+            nextScaleX = 1;
+          } else if (desiredScale >= minFontScale) {
+            nextFontScale = desiredScale;
+            nextScaleX = 1;
+          } else {
+            nextFontScale = minFontScale;
+            nextScaleX = Math.max(0.01, desiredScale / minFontScale);
+          }
+
+          if (Math.abs(nextFontScale - jobIntentionFontScale) > 0.01) {
+            setJobIntentionFontScale(nextFontScale);
+          }
+          if (Math.abs(nextScaleX - jobIntentionScale) > 0.01) {
+            setJobIntentionScale(nextScaleX);
+          }
+        }
+      } else {
+        if (jobIntentionScale !== 1) setJobIntentionScale(1);
+        if (jobIntentionFontScale !== 1) setJobIntentionFontScale(1);
+      }
     };
     // 初次 + 多轮调度，确保收缩场景也能捕获（如列数减少、模块隐藏）
     measure();
@@ -158,6 +215,9 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
     personalInfoRowCount,
     stretchRowGapPx,
     idPhotoHeight,
+    jobIntentionText,
+    jobIntentionScale,
+    jobIntentionFontScale,
   ]);
 
   return (
@@ -191,10 +251,15 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
           {/* 求职意向 */}
           {jobIntentionText && (
             <div
+              ref={jobIntentionWrapRef}
               className={`job-intention-line text-sm text-muted-foreground mb-3 ${resumeData.centerTitle ? 'text-center' : ''}`}
-              style={jobIntentionStyle}
+              style={jobIntentionWrapStyle}
             >
-              {jobIntentionText}
+              <span ref={jobIntentionBadgeRef} style={jobIntentionBadgeStyle}>
+                <span ref={jobIntentionTextRef} style={jobIntentionTextStyle}>
+                  {jobIntentionText}
+                </span>
+              </span>
             </div>
           )}
 
