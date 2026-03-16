@@ -83,33 +83,34 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
   const avatarShape = isIdPhoto ? "square" : (resumeData.personalInfoSection?.avatarShape === "square" ? "square" : "circle");
   const avatarShapeClasses =
     avatarShape === "square" ? "rounded-none avatar-square" : "rounded-full";
-  const idPhotoRatio = 5 / 7;
-  const baseAvatarStyle = isIdPhoto
-    ? { width: "5rem", height: "7rem" }
-    : { width: "5rem", height: "5rem" };
+  const baseAvatarStyle = isIdPhoto ? undefined : { width: "5rem", height: "5rem" };
   const rightAvatarStyle = rightBoxHeight
-    ? (isIdPhoto
-      ? { height: rightBoxHeight, width: rightBoxHeight * idPhotoRatio }
-      : { width: rightBoxHeight, height: rightBoxHeight })
+    ? (isIdPhoto ? undefined : { width: rightBoxHeight, height: rightBoxHeight })
     : baseAvatarStyle;
+  const headerAlignClass = resumeData.centerTitle
+    ? 'flex-col items-center'
+    : 'justify-between items-start';
 
   return (
     <div className="resume-preview resume-content">
       {/* 头部信息 */}
-      <div className={`flex mb-6 ${resumeData.centerTitle ? 'flex-col items-center' : 'justify-between items-start'}`}>
+      <div className={`flex mb-6 ${headerAlignClass}`}>
         {/* 居中标题模式下，头像置于最上方并居中显示 */}
         {resumeData.centerTitle && resumeData.avatar && (
           <div className="mb-4">
             <img
               src={resumeData.avatar}
               alt="头像"
-              className={`resume-avatar ${avatarShapeClasses} object-cover border-2 border-border box-border mx-auto`}
+              className={`resume-avatar ${avatarShapeClasses} ${isIdPhoto ? "is-id-photo" : ""} object-cover border-2 border-border box-border mx-auto`}
               style={baseAvatarStyle}
             />
           </div>
         )}
 
-        <div ref={leftRef} className={`flex-1 flex flex-col ${resumeData.centerTitle ? 'w-full' : ''}`}>
+        <div
+          ref={leftRef}
+          className={`flex-1 flex flex-col resume-header-left ${resumeData.avatar && !resumeData.centerTitle && isIdPhoto ? "is-id-photo self-stretch" : ""} ${resumeData.centerTitle ? 'w-full' : ''}`}
+        >
           <h1 className={`resume-title text-2xl font-bold text-foreground mb-4 ${resumeData.centerTitle ? 'text-center' : ''}`}>
             {resumeData.title || "简历标题"}
           </h1>
@@ -124,7 +125,10 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
           {/* 个人信息 */}
           {(resumeData.personalInfoSection?.layout?.mode === 'inline') ? (
             /* 单行显示模式（inline） */
-            <div className="personal-info flex items-center justify-between w-full whitespace-nowrap" style={{ backgroundColor: '#F5F6F8', padding: '8px 12px', borderRadius: '4px' }}>
+            <div
+              className="personal-info flex items-center justify-between w-full whitespace-nowrap"
+              style={{ backgroundColor: '#F5F6F8', padding: '8px 12px', borderRadius: '4px' }}
+            >
               {resumeData.personalInfoSection?.personalInfo.map((item) => (
                 <div
                   key={item.id}
@@ -215,11 +219,14 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
 
         {/* 头像：左右布局时放在右侧，并在父容器高度内垂直居中 */}
         {resumeData.avatar && !resumeData.centerTitle && (
-          <div ref={rightRef} className="ml-6 flex items-start shrink-0 resume-avatar-wrapper">
+          <div
+            ref={rightRef}
+            className={`ml-6 flex items-start shrink-0 resume-avatar-wrapper ${isIdPhoto ? "is-id-photo" : ""}`}
+          >
             <img
               src={resumeData.avatar}
               alt="头像"
-              className={`resume-avatar ${avatarShapeClasses} object-cover border-2 border-border box-border`}
+              className={`resume-avatar ${avatarShapeClasses} ${isIdPhoto ? "is-id-photo" : ""} object-cover border-2 border-border box-border`}
               style={rightAvatarStyle}
             />
           </div>

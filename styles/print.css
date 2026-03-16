@@ -139,8 +139,31 @@
     border-radius: 0 !important;
   }
 
+  .resume-avatar.is-id-photo {
+    width: 25mm !important;
+    height: 35mm !important;
+  }
+
+  .resume-avatar-wrapper.is-id-photo {
+    width: 25mm !important;
+    min-width: 25mm !important;
+  }
+
   .resume-avatar-wrapper {
     margin-left: 12px !important;
+  }
+
+  .resume-header-left.is-id-photo {
+    min-height: 35mm !important;
+    align-self: stretch !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .resume-header-left.is-id-photo .personal-info,
+  .resume-header-left.is-id-photo .personal-info-grid {
+    margin-top: auto !important;
+    margin-bottom: 0 !important;
   }
 
   /* 图标在打印时的处理：使图标高度与文本高度一致 */
@@ -418,6 +441,29 @@
 
 .pdf-preview-mode .resume-avatar-wrapper {
   margin-left: 12px;
+}
+
+.resume-avatar.is-id-photo {
+  width: 25mm;
+  height: 35mm;
+}
+
+.resume-avatar-wrapper.is-id-photo {
+  width: 25mm;
+  min-width: 25mm;
+}
+
+.resume-header-left.is-id-photo {
+  min-height: 35mm;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+}
+
+.resume-header-left.is-id-photo .personal-info,
+.resume-header-left.is-id-photo .personal-info-grid {
+  margin-top: auto;
+  margin-bottom: 0;
 }
 
 .pdf-preview-mode .module-content {
