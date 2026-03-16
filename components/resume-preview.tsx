@@ -81,6 +81,7 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
   const avatarShape = resumeData.personalInfoSection?.avatarShape === "square" ? "square" : "circle";
   const avatarShapeClasses =
     avatarShape === "square" ? "rounded-none avatar-square" : "rounded-full";
+  const rightAvatarStyle = rightBoxHeight ? { width: rightBoxHeight, height: rightBoxHeight } : undefined;
 
   return (
     <div className="resume-preview resume-content">
@@ -203,11 +204,12 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
 
         {/* 头像：左右布局时放在右侧，并在父容器高度内垂直居中 */}
         {resumeData.avatar && !resumeData.centerTitle && (
-          <div ref={rightRef} className="ml-6 flex items-start" style={{ height: rightBoxHeight }}>
+          <div ref={rightRef} className="ml-6 flex items-start shrink-0">
             <img
               src={resumeData.avatar}
               alt="头像"
-              className={`resume-avatar h-full aspect-square ${avatarShapeClasses} object-cover border-2 border-border box-border`}
+              className={`resume-avatar w-20 h-20 ${avatarShapeClasses} object-cover border-2 border-border box-border`}
+              style={rightAvatarStyle}
             />
           </div>
         )}
