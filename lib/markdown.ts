@@ -79,3 +79,12 @@ export function markdownToRichContent(text: string): JSONContent {
   }
   return parseMarkdown(trimmed)
 }
+
+/**
+ * Serialize Tiptap JSONContent back into a Markdown string.
+ * This is used when sending rich text to the AI — the AI receives Markdown,
+ * enhances it, and returns Markdown which is then parsed back into JSONContent.
+ */
+export function jsonContentToMarkdown(content: JSONContent): string {
+  return markdownManager.serialize(content)
+}

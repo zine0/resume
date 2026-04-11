@@ -241,35 +241,6 @@ fn extract_text(value: &Value) -> String {
     }
 }
 
-fn is_simple_text_content(value: &Value) -> bool {
-    match value {
-        Value::Object(map) => {
-            if map.get("type").and_then(Value::as_str) == Some("text") {
-                return !map
-                    .get("marks")
-                    .and_then(Value::as_array)
-                    .map(|marks| !marks.is_empty())
-                    .unwrap_or(false);
-            }
-
-            if map.get("type").and_then(Value::as_str) == Some("hardBreak") {
-                return true;
-            }
-
-            match map.get("content") {
-                Some(Value::Array(items)) => items.iter().all(is_simple_text_content),
-                Some(content) => is_simple_text_content(content),
-                None => matches!(
-                    map.get("type").and_then(Value::as_str),
-                    Some("paragraph") | Some("doc")
-                ),
-            }
-        }
-        Value::Array(items) => items.iter().all(is_simple_text_content),
-        _ => false,
-    }
-}
-
 fn parse_salary_range(text: &str) -> Option<SalaryRange> {
     let numbers = text
         .split(|ch: char| !ch.is_ascii_digit())
@@ -470,20 +441,21 @@ fn build_editable_snapshot(data: &ResumeData) -> ResumeOptimizationSnapshot {
             }
 
             for element in &row.elements {
-                if is_simple_text_content(&element.content) {
-                    let text = extract_text(&element.content);
-                    targets.push(EditableTargetSnapshot {
-                        id: element.id.clone(),
-                        target_kind: AiPatchTargetKind::ModuleElement,
-                        section: module.title.clone(),
-                        field: None,
-                        content_kind: Some(AiPatchContentKind::Markdown),
-                        original_text: text,
-                        tags: None,
-                        salary_range: None,
-                        item_type: None,
-                    });
+                let text = extract_text(&element.content);
+                if text.trim().is_empty() {
+                    continue;
                 }
+                targets.push(EditableTargetSnapshot {
+                    id: element.id.clone(),
+                    target_kind: AiPatchTargetKind::ModuleElement,
+                    section: module.title.clone(),
+                    field: None,
+                    content_kind: Some(AiPatchContentKind::Markdown),
+                    original_text: text,
+                    tags: None,
+                    salary_range: None,
+                    item_type: None,
+                });
             }
         }
     }
@@ -642,28 +614,12 @@ fn build_optimization_warnings(data: &ResumeData, summary: &PatchValidationSumma
         .iter()
         .filter(|item| is_protected_personal_info(item))
         .count();
-    let skipped_complex_module_element_count = data
-        .modules
-        .iter()
-        .flat_map(|module| module.rows.iter())
-        .filter(|row| row.row_type != Some(ModuleContentRowType::Tags))
-        .flat_map(|row| row.elements.iter())
-        .filter(|element| !is_simple_text_content(&element.content))
-        .count();
-
     let mut warnings = Vec::new();
 
     if protected_personal_info_count > 0 {
         warnings.push(format!(
             "\u{5df2}\u{4fdd}\u{7559} {} \u{9879}\u{8054}\u{7cfb}\u{65b9}\u{5f0f}/\u{94fe}\u{63a5}\u{7b49}\u{4e8b}\u{5b9e}\u{4fe1}\u{606f}\u{ff0c}\u{4e0d}\u{53c2}\u{4e0e} AI \u{6539}\u{5199}\u{3002}",
             protected_personal_info_count
-        ));
-    }
-
-    if skipped_complex_module_element_count > 0 {
-        warnings.push(format!(
-            "\u{5df2}\u{4fdd}\u{7559} {} \u{5904}\u{590d}\u{6742}\u{5bcc}\u{6587}\u{672c}\u{7ed3}\u{6784}\u{ff0c}\u{907f}\u{514d}\u{7834}\u{574f}\u{539f}\u{6709}\u{683c}\u{5f0f}\u{3002}",
-            skipped_complex_module_element_count
         ));
     }
 

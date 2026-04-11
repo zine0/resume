@@ -6,11 +6,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Icon } from "@iconify/react"
 import type { Editor } from '@tiptap/react'
+import type { JSONContent } from "@/types/resume"
 import { useColorPicker } from "@/components/color-picker-manager"
 import { useToast } from "@/hooks/use-toast"
 import { getAIConfig } from "@/lib/ai-config"
 import { aiPolishText } from "@/lib/ai-service"
-import { markdownToRichContent } from "@/lib/markdown"
+import { jsonContentToMarkdown, markdownToRichContent } from "@/lib/markdown"
 import type { PolishMode } from "@/types/ai"
 
 // Supported fonts
@@ -173,8 +174,10 @@ export default function RichTextToolbar({ editor }: RichTextToolbarProps) {
 
     if (!savedSelectionRef.current) return
     const { from, to } = savedSelectionRef.current
-    const selectedText = editor.state.doc.textBetween(from, to, "\n")
-    if (!selectedText.trim()) {
+    const slice = editor.state.doc.slice(from, to)
+    const selectedJson = slice.toJSON() as JSONContent
+    const selectedMarkdown = jsonContentToMarkdown(selectedJson)
+    if (!selectedMarkdown.trim()) {
       toast({ title: "请先选择要优化的文字" })
       return
     }
@@ -187,7 +190,7 @@ export default function RichTextToolbar({ editor }: RichTextToolbarProps) {
 
     setAiLoading(true)
     try {
-      const result = await aiPolishText(selectedText, mode)
+      const result = await aiPolishText(selectedMarkdown, mode)
       restoreSavedSelection()
       const richContent = markdownToRichContent(result.text)
       editor.chain().focus().deleteSelection().insertContent(richContent).run()
