@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@iconify/react";
 import type { ResumeData } from "@/types/resume";
-import { generatePdfFilename, exportToMagicyanFile, downloadFile, cn } from "@/lib/utils";
+import { generatePdfFilename, cn } from "@/lib/utils";
+import { exportResumeFile } from "@/lib/storage";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import type { Options as HtmlToImageOptions } from "html-to-image/lib/types";
+import { resumeDataToHtml, normalizeResumeDataForAvatar } from "@/components/pdf-viewer";
 
 interface ExportButtonProps {
   resumeData: ResumeData;
@@ -19,6 +21,50 @@ interface ExportButtonProps {
   size?: "default" | "sm" | "lg" | "icon";
   className?: string;
   showImageOptions?: boolean; // 在没有预览面板时可关闭图片导出
+}
+
+async function saveWithDialog(
+  dataUrl: string,
+  defaultName: string,
+  filters: { name: string; extensions: string[] }[]
+): Promise<boolean> {
+  const { save } = await import("@tauri-apps/plugin-dialog");
+  const dest = await save({ defaultPath: defaultName, filters });
+  if (!dest) return false;
+
+  const base64Match = dataUrl.match(/^data:[^;]+;base64,(.+)$/);
+  if (!base64Match) throw new Error("Invalid data URL format");
+  const binaryStr = atob(base64Match[1]);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+
+  const { writeFile } = await import("@tauri-apps/plugin-fs");
+  await writeFile(dest, bytes);
+  return true;
+}
+
+async function saveTextWithDialog(
+  content: string,
+  defaultName: string,
+  filters: { name: string; extensions: string[] }[]
+): Promise<boolean> {
+  const { save } = await import("@tauri-apps/plugin-dialog");
+  const dest = await save({ defaultPath: defaultName, filters });
+  if (!dest) return false;
+
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(content);
+
+  const { writeFile } = await import("@tauri-apps/plugin-fs");
+  await writeFile(dest, bytes);
+  return true;
+}
+
+async function invokeTauriPdf(html: string, filename: string): Promise<string> {
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string>("generate_pdf", { html, filename });
 }
 
 export function ExportButton({
@@ -78,7 +124,7 @@ export function ExportButton({
     try {
       const { sourceEl: resumeElement, cleanup: cleanupPreview } = await ensurePreviewForExport();
 
-      // 为了避免跨域图片导致的画布污染，导出时使用克隆节点，并将远程图片通过同源代理加载
+      // 克隆节点并将远程图片转为 data URL，避免 canvas 污染
       const { nodeForExport, cleanup } = await prepareNodeForExport(resumeElement);
       try {
         if (format === "svg") {
@@ -117,25 +163,20 @@ export function ExportButton({
             // 浏览器支持 canvas 转 webp：将 PNG/JPEG Blob 转换为 webp
             // 若不支持，将保留原始 blob 类型
             const webpUrl = await convertBlobToFormat(blob, "image/webp");
-            dataUrl = webpUrl ?? URL.createObjectURL(blob);
+            dataUrl = webpUrl ?? await blobToDataUrl(blob);
             break;
           default:
             throw new Error("不支持的格式");
         }
 
-        // 下载图片
-        const link = document.createElement("a");
-        link.href = dataUrl;
-        link.download = generatePdfFilename(resumeData.title).replace(
+        const defaultName = generatePdfFilename(resumeData.title).replace(
           ".pdf",
           `.${format}`
         );
-        link.click();
-
-        // 清理 URL（如果是 blob URL）
-        if (dataUrl.startsWith("blob:")) {
-          URL.revokeObjectURL(dataUrl);
-        }
+        const saved = await saveWithDialog(dataUrl, defaultName, [
+          { name: format.toUpperCase(), extensions: [format] },
+        ]);
+        if (!saved) return;
       } finally {
         // 移除导出时创建的克隆节点
         cleanup();
@@ -175,14 +216,14 @@ export function ExportButton({
         skipFonts: true,
       } as HtmlToImageOptions);
 
-      // 下载 SVG
-      const link = document.createElement("a");
-      link.href = dataUrl;
-      link.download = generatePdfFilename(resumeData.title).replace(
+      const defaultName = generatePdfFilename(resumeData.title).replace(
         ".pdf",
         ".svg"
       );
-      link.click();
+      const saved = await saveWithDialog(dataUrl, defaultName, [
+        { name: "SVG", extensions: ["svg"] },
+      ]);
+      if (!saved) return;
 
       toast({
         title: "导出成功",
@@ -194,7 +235,7 @@ export function ExportButton({
     }
   };
 
-  // 将节点克隆到离屏容器，并将潜在的跨域图片改为通过同源代理加载
+  // 将节点克隆到离屏容器，并将远程图片直接 fetch 转为 data URL（Tauri 无 CORS 限制）
   async function prepareNodeForExport(source: HTMLElement): Promise<{ nodeForExport: HTMLElement; cleanup: () => void }> {
     const clone = source.cloneNode(true) as HTMLElement;
     const container = document.createElement("div");
@@ -211,24 +252,25 @@ export function ExportButton({
     document.body.appendChild(container);
 
     const imgs = Array.from(clone.querySelectorAll<HTMLImageElement>("img"));
-    const originalSrc: Array<{ el: HTMLImageElement; src: string }> = [];
 
-    const sameOrigin = (url: string) => {
-      try {
-        const u = new URL(url, window.location.href);
-        return u.origin === window.location.origin;
-      } catch { return true; }
-    };
-
-    // 将远程图片切换为同源代理，避免 canvas 污染
+    // 在 Tauri 中无 CORS 限制，直接 fetch 远程图片并转为 data URL
     for (const img of imgs) {
       const src = img.getAttribute("src") || "";
       if (!src || src.startsWith("data:") || src.startsWith("blob:")) continue;
       if (!/^https?:\/\//i.test(src)) continue;
-      if (sameOrigin(src)) continue;
-      originalSrc.push({ el: img, src });
-      const proxied = `/api/image-proxy?url=${encodeURIComponent(src)}`;
-      img.setAttribute("src", proxied);
+
+      try {
+        const resp = await fetch(src);
+        const blob = await resp.blob();
+        const dataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+        img.setAttribute("src", dataUrl);
+      } catch {
+        // fallback: image will just fail to load in export
+      }
       img.removeAttribute("crossorigin");
     }
 
@@ -236,7 +278,6 @@ export function ExportButton({
     await waitForImages(imgs, 5000);
 
     const cleanup = () => {
-      // 不需要恢复 clone 的 src，因为会整体移除
       if (container.parentNode) container.parentNode.removeChild(container);
     };
     return { nodeForExport: clone, cleanup };
@@ -279,11 +320,35 @@ export function ExportButton({
     }
   }
 
+  async function blobToDataUrl(blob: Blob): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(new Error("Failed to convert blob to data URL"));
+      reader.readAsDataURL(blob);
+    });
+  }
+
   const exportAsPDF = async () => {
     setIsExporting(true);
     try {
-      window.print();
-      toast({ title: "导出成功", description: "请在打印对话框中选择「另存为 PDF」" });
+      const normalized = normalizeResumeDataForAvatar(resumeData);
+      const html = resumeDataToHtml(normalized);
+      const filename = generatePdfFilename(normalized.title || "");
+
+      const pdfPath = await invokeTauriPdf(html, filename);
+
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const dest = await save({
+        defaultPath: pdfPath.split("/").pop() || filename,
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      });
+      if (!dest) return;
+
+      const { copyFile } = await import("@tauri-apps/plugin-fs");
+      await copyFile(pdfPath, dest);
+
+      toast({ title: "导出成功", description: "简历已导出为 PDF 格式" });
     } catch (e) {
       const msg = e instanceof Error ? e.message : JSON.stringify(e || {});
       console.error("导出 PDF 失败:", msg);
@@ -297,11 +362,15 @@ export function ExportButton({
     }
   };
 
-  const exportAsJSON = () => {
+  const exportAsJSON = async () => {
     try {
-      const fileContent = exportToMagicyanFile(resumeData);
+      const fileContent = await exportResumeFile(resumeData);
       const filename = generatePdfFilename(resumeData.title || "").replace(".pdf", ".json");
-      downloadFile(fileContent, filename, "application/json");
+      const saved = await saveTextWithDialog(fileContent, filename, [
+        { name: "JSON", extensions: ["json"] },
+      ]);
+      if (!saved) return;
+
       toast({
         title: "导出成功",
         description: `简历已导出为 JSON 格式`,

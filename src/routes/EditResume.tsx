@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import ResumeBuilder from "@/components/resume-builder"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import type { ResumeData, StoredResume } from "@/types/resume"
-import { getResumeById, updateEntryData, StorageError } from "@/lib/storage"
+import { createEntryFromData, getResumeById, updateEntryData, StorageError } from "@/lib/storage"
 import { useToast } from "@/hooks/use-toast"
 
 export default function EditResume() {
@@ -12,13 +12,21 @@ export default function EditResume() {
   const navigate = useNavigate()
   const { toast } = useToast()
   const [, setCurrentData] = useState<ResumeData | null>(null)
+  const [entry, setEntry] = useState<StoredResume | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const entry = useMemo<StoredResume | null>(() => (id ? getResumeById(id) : null), [id])
+  useEffect(() => {
+    if (!id) { setLoading(false); return }
+    getResumeById(id).then((e) => {
+      setEntry(e)
+      setLoading(false)
+    })
+  }, [id])
 
   const handleSave = async (data: ResumeData) => {
     try {
       if (!id) return
-      const updated = updateEntryData(id, data)
+      const updated = await updateEntryData(id, data)
       toast({ title: "保存成功", description: new Date(updated.updatedAt).toLocaleString() })
     } catch (e: unknown) {
       if (e instanceof StorageError && e.code === "QUOTA_EXCEEDED") {
@@ -32,6 +40,15 @@ export default function EditResume() {
         toast({ title: "保存失败", description: message, variant: "destructive" })
       }
     }
+  }
+
+  const handleCreateResumeCopy = async (data: ResumeData) => {
+    const entry = await createEntryFromData(data)
+    navigate(`/edit/${entry.id}`)
+  }
+
+  if (loading) {
+    return <main className="min-h-screen bg-background" />
   }
 
   if (!entry) {
@@ -54,6 +71,8 @@ export default function EditResume() {
         onChange={setCurrentData}
         onBack={() => navigate("/")}
         onSave={(data) => handleSave(data)}
+        onCreateTailoredResume={(data) => handleCreateResumeCopy(data)}
+        onCreateOptimizedResume={(data) => handleCreateResumeCopy(data)}
       />
     </main>
   )

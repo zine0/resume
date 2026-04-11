@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Icon } from "@iconify/react"
 import type { ResumeModule, ModuleContentRow, ModuleContentElement } from "@/types/resume"
+import { createResumeModule, createRichTextRow, createTagsRow } from "@/lib/storage"
+import { useToast } from "@/hooks/use-toast"
 import IconPicker from "./icon-picker"
 import FloatingActionBar from "./floating-action-bar"
 import RichTextInput from "./rich-text-input"
@@ -26,77 +28,32 @@ interface ModuleEditorProps {
   onUpdate: (modules: ResumeModule[]) => void
 }
 
-/**
- * 生成唯一ID
- */
-const generateId = () => `id-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
-/**
- * 创建新模块
- */
-const createNewModule = (order: number): ResumeModule => ({
-  id: generateId(),
-  title: "新模块",
-  icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path fill="currentColor" d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/></svg>',
-  order,
-  rows: [],
-})
-
-/**
- * 创建新行
- */
-const createNewRow = (columns: 1 | 2 | 3 | 4, order: number): ModuleContentRow => {
-  const elements: ModuleContentElement[] = []
-  for (let i = 0; i < columns; i++) {
-    elements.push({
-      id: generateId(),
-      content: {
-        type: 'doc',
-        content: [
-          {
-            type: 'paragraph',
-            content: [],
-          },
-        ],
-      },
-      columnIndex: i,
-    })
-  }
-
-  return {
-    id: generateId(),
-    type: 'rich',
-    columns,
-    elements,
-    order,
-  }
-}
-
-/**
- * 创建标签行
- */
-const createNewTagsRow = (order: number): ModuleContentRow => {
-  return {
-    id: generateId(),
-    type: 'tags',
-    columns: 1,
-    elements: [],
-    tags: [],
-    order,
-  }
-}
-
 export default function ModuleEditor({ modules, onUpdate }: ModuleEditorProps) {
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
+  const [isAddingModule, setIsAddingModule] = useState(false)
+  const { toast } = useToast()
 
   /**
    * 添加新模块
    */
-  const addModule = () => {
-    const newModule = createNewModule(modules.length)
-    const updatedModules = [...modules, newModule]
-    onUpdate(updatedModules)
-    setExpandedModules((prev) => new Set([...prev, newModule.id]))
+  const addModule = async () => {
+    if (isAddingModule) return
+    try {
+      setIsAddingModule(true)
+      const nextOrder = modules.reduce((max, module) => Math.max(max, module.order), -1) + 1
+      const newModule = await createResumeModule(nextOrder)
+      const updatedModules = [...modules, newModule]
+      onUpdate(updatedModules)
+      setExpandedModules((prev) => new Set([...prev, newModule.id]))
+    } catch (e) {
+      toast({
+        title: "添加失败",
+        description: e instanceof Error ? e.message : "无法创建新的简历模块",
+        variant: "destructive",
+      })
+    } finally {
+      setIsAddingModule(false)
+    }
   }
 
   /**
@@ -113,7 +70,12 @@ export default function ModuleEditor({ modules, onUpdate }: ModuleEditorProps) {
    * 删除模块
    */
   const removeModule = (id: string) => {
-    const updatedModules = modules.filter((module) => module.id !== id)
+    const updatedModules = modules
+      .filter((module) => module.id !== id)
+      .map((module, index) => ({
+        ...module,
+        order: index,
+      }))
     onUpdate(updatedModules)
     setExpandedModules((prev) => {
       const newSet = new Set(prev)
@@ -162,7 +124,7 @@ export default function ModuleEditor({ modules, onUpdate }: ModuleEditorProps) {
           <Icon icon="mdi:view-module" className="w-5 h-5 text-primary" />
           <h2 className="section-title">简历模块</h2>
         </div>
-        <Button size="sm" variant="outline" onClick={addModule} className="gap-2 bg-transparent">
+        <Button size="sm" variant="outline" onClick={addModule} disabled={isAddingModule} className="gap-2 bg-transparent">
           <Icon icon="mdi:plus" className="w-4 h-4" />
           添加模块
         </Button>
@@ -233,34 +195,60 @@ function ModuleItem({
   onUpdate,
   onRemove,
 }: ModuleItemProps) {
+  const { toast } = useToast()
+  const [isAddingRow, setIsAddingRow] = useState(false)
 
   /**
    * 添加新行
    */
-  const addRow = (columns: 1 | 2 | 3 | 4, afterRowId?: string) => {
+  const addRow = async (columns: 1 | 2 | 3 | 4, afterRowId?: string) => {
+    if (isAddingRow) return
     const rows = [...module.rows]
     const afterIndex = afterRowId ? rows.findIndex((r) => r.id === afterRowId) : -1
     const insertIndex = afterIndex >= 0 ? afterIndex + 1 : rows.length
-    const newRow = createNewRow(columns, insertIndex)
-    rows.splice(insertIndex, 0, newRow)
-    // 重新计算 order，保证排序正确
-    rows.forEach((r, i) => {
-      r.order = i
-    })
-    onUpdate({ rows })
+    try {
+      setIsAddingRow(true)
+      const newRow = await createRichTextRow(columns, insertIndex)
+      rows.splice(insertIndex, 0, newRow)
+      // 重新计算 order，保证排序正确
+      rows.forEach((r, i) => {
+        r.order = i
+      })
+      onUpdate({ rows })
+    } catch (e) {
+      toast({
+        title: "添加失败",
+        description: e instanceof Error ? e.message : "无法创建新的内容行",
+        variant: "destructive",
+      })
+    } finally {
+      setIsAddingRow(false)
+    }
   }
 
   /**
    * 添加标签行
    */
-  const addTagsRow = (afterRowId?: string) => {
+  const addTagsRow = async (afterRowId?: string) => {
+    if (isAddingRow) return
     const rows = [...module.rows]
     const afterIndex = afterRowId ? rows.findIndex((r) => r.id === afterRowId) : -1
     const insertIndex = afterIndex >= 0 ? afterIndex + 1 : rows.length
-    const newRow = createNewTagsRow(insertIndex)
-    rows.splice(insertIndex, 0, newRow)
-    rows.forEach((r, i) => { r.order = i })
-    onUpdate({ rows })
+    try {
+      setIsAddingRow(true)
+      const newRow = await createTagsRow(insertIndex)
+      rows.splice(insertIndex, 0, newRow)
+      rows.forEach((r, i) => { r.order = i })
+      onUpdate({ rows })
+    } catch (e) {
+      toast({
+        title: "添加失败",
+        description: e instanceof Error ? e.message : "无法创建新的标签行",
+        variant: "destructive",
+      })
+    } finally {
+      setIsAddingRow(false)
+    }
   }
 
   /**
@@ -277,7 +265,12 @@ function ModuleItem({
    * 删除行
    */
   const removeRow = (rowId: string) => {
-    const updatedRows = module.rows.filter((row) => row.id !== rowId)
+    const updatedRows = module.rows
+      .filter((row) => row.id !== rowId)
+      .map((row, index) => ({
+        ...row,
+        order: index,
+      }))
     onUpdate({ rows: updatedRows })
   }
 
@@ -433,16 +426,16 @@ interface ContentRowEditorProps {
   onUpdate: (updates: Partial<ModuleContentRow>) => void
   onRemove: () => void
   onUpdateElement: (elementId: string, updates: Partial<ModuleContentElement>) => void
-  onAddRow: (columns: 1 | 2 | 3 | 4, afterRowId?: string) => void
-  onAddTagsRow?: () => void
+  onAddRow: (columns: 1 | 2 | 3 | 4, afterRowId?: string) => Promise<void>
+  onAddTagsRow?: () => Promise<void>
 }
 
 /**
  * 空行占位符组件
  */
 interface EmptyRowPlaceholderProps {
-  onAddRow: (columns: 1 | 2 | 3 | 4, afterRowId?: string) => void
-  onAddTagsRow?: () => void
+  onAddRow: (columns: 1 | 2 | 3 | 4, afterRowId?: string) => Promise<void>
+  onAddTagsRow?: () => Promise<void>
 }
 
 function EmptyRowPlaceholder({ onAddRow, onAddTagsRow }: EmptyRowPlaceholderProps) {

@@ -30,7 +30,8 @@ import { Icon } from "@iconify/react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import type { JobIntentionItem, JobIntentionSection } from "@/types/resume";
-import { createNewJobIntentionItem } from "@/lib/utils";
+import { createJobIntentionItem } from "@/lib/storage";
+import { useToast } from "@/hooks/use-toast";
 
 interface JobIntentionEditorProps {
   jobIntentionSection?: JobIntentionSection;
@@ -44,6 +45,8 @@ export default function JobIntentionEditor({
   jobIntentionSection,
   onUpdate,
 }: JobIntentionEditorProps) {
+  const { toast } = useToast();
+  const [isAddingItem, setIsAddingItem] = useState(false);
   const enabled = jobIntentionSection?.enabled ?? true;
   const items = jobIntentionSection?.items || [];
 
@@ -106,15 +109,27 @@ export default function JobIntentionEditor({
   /**
    * 添加新的求职意向项
    */
-  const addItem = (type: 'workYears' | 'position' | 'city' | 'salary' | 'custom') => {
-    if (items.length >= 6) {
+  const addItem = async (type: 'workYears' | 'position' | 'city' | 'salary' | 'custom') => {
+    if (items.length >= 6 || isAddingItem) {
       return;
     }
-    const newItem = createNewJobIntentionItem(type, items.length);
-    onUpdate({
-      items: [...items, newItem],
-      enabled
-    });
+    try {
+      setIsAddingItem(true);
+      const nextOrder = items.reduce((max, item) => Math.max(max, item.order), -1) + 1;
+      const newItem = await createJobIntentionItem(type, nextOrder);
+      onUpdate({
+        items: [...items, newItem],
+        enabled
+      });
+    } catch (e) {
+      toast({
+        title: "添加失败",
+        description: e instanceof Error ? e.message : "无法创建新的求职意向项",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingItem(false);
+    }
   };
 
   /**
@@ -141,7 +156,12 @@ export default function JobIntentionEditor({
    * 删除求职意向项
    */
   const removeItem = (id: string) => {
-    const updatedItems = items.filter((item) => item.id !== id);
+    const updatedItems = items
+      .filter((item) => item.id !== id)
+      .map((item, index) => ({
+        ...item,
+        order: index,
+      }));
     onUpdate({
       items: updatedItems,
       enabled
@@ -171,7 +191,7 @@ export default function JobIntentionEditor({
               <Button
                 size="sm"
                 variant="outline"
-                disabled={items.length >= 6}
+                disabled={items.length >= 6 || isAddingItem}
                 className="gap-2 bg-transparent"
               >
                 <Icon icon="mdi:plus" className="w-4 h-4" />
@@ -183,7 +203,7 @@ export default function JobIntentionEditor({
                 <DropdownMenuItem
                   key={typeOption.type}
                   onClick={() => !typeOption.disabled && addItem(typeOption.type)}
-                  disabled={typeOption.disabled}
+                  disabled={typeOption.disabled || isAddingItem}
                   className="gap-2 cursor-pointer"
                 >
                   <Icon icon={typeOption.icon} className="w-4 h-4" />

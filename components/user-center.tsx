@@ -10,9 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Icon } from "@iconify/react"
 import { useToast } from "@/hooks/use-toast"
 import type { StoredResume } from "@/types/resume"
-import { importFromMagicyanFile } from "@/lib/utils"
-import { StorageError, createEntryFromData, deleteResumes, getAllResumes, loadDefaultTemplate, loadExampleTemplate } from "@/lib/storage"
-import { createDefaultResumeData } from "@/lib/utils"
+import { StorageError, createEntryFromData, deleteResumes, getAllResumes, getDefaultResumeData, importResumeFile, loadDefaultTemplate, loadExampleTemplate } from "@/lib/storage"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import ExportButton from "@/components/export-button"
 
@@ -31,9 +29,9 @@ export default function UserCenter() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [importing, setImporting] = useState(false)
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     try {
-      setItems(getAllResumes())
+      setItems(await getAllResumes())
     } catch (e) {
       toast({ title: "读取失败", description: e instanceof Error ? e.message : "无法读取本地存储" })
     }
@@ -111,7 +109,7 @@ export default function UserCenter() {
   const prefetchAndOpenNew = async (type: "default" | "example") => {
     try {
       const tpl = type === "example" ? await loadExampleTemplate() : await loadDefaultTemplate()
-      const data = tpl ?? createDefaultResumeData()
+      const data = tpl ?? await getDefaultResumeData()
       if (typeof window !== "undefined") {
         try { sessionStorage.setItem("new-edit-initial-data", JSON.stringify(data)) } catch { }
       }
@@ -143,8 +141,8 @@ export default function UserCenter() {
       }
       setImporting(true)
       const content = await file.text()
-      const data = importFromMagicyanFile(content)
-      const entry = createEntryFromData(data)
+      const data = await importResumeFile(content)
+      const entry = await createEntryFromData(data)
       toast({ title: "导入成功", description: `已导入：${entry.resumeData.title}` })
       refresh()
       // Do not auto-navigate; user can choose next action
@@ -161,9 +159,9 @@ export default function UserCenter() {
     }
   }
 
-  const handleDelete = (ids: string[]) => {
+  const handleDelete = async (ids: string[]) => {
     try {
-      deleteResumes(ids)
+      await deleteResumes(ids)
       toast({ title: "删除成功", description: `已删除 ${ids.length} 条简历` })
       setSelected(new Set())
       refresh()

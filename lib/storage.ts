@@ -1,7 +1,14 @@
 
-import { importFromMagicyanFile, validateResumeData } from "@/lib/utils"
-import type { ResumeData, StoredResume } from "@/types/resume"
-import { LOCAL_STORAGE_KEY } from "@/types/resume"
+import { invoke } from "@tauri-apps/api/core"
+import type {
+  JobIntentionItem,
+  JobIntentionSection,
+  ModuleContentRow,
+  PersonalInfoItem,
+  ResumeData,
+  ResumeModule,
+  StoredResume,
+} from "@/types/resume"
 
 export type StorageErrorCode =
   | "UNAVAILABLE"
@@ -18,123 +25,155 @@ export class StorageError extends Error {
   }
 }
 
-function ensureClient() {
-  if (typeof window === "undefined") {
-    throw new StorageError("只能在浏览器环境中访问本地存储", "UNAVAILABLE")
+interface ResumeValidationResult {
+  isValid: boolean
+  errors: string[]
+  normalizedData: ResumeData
+}
+
+function mapTauriError(e: unknown): StorageError {
+  if (e instanceof StorageError) return e
+  const msg = e instanceof Error ? e.message : String(e)
+  if (msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("no space left")) {
+    return new StorageError("存储容量已满", "QUOTA_EXCEEDED")
+  }
+  if (msg.toLowerCase().includes("unavailable") || msg.toLowerCase().includes("not available")) {
+    return new StorageError("Tauri 后端不可用", "UNAVAILABLE")
+  }
+  return new StorageError(msg, "UNKNOWN")
+}
+
+export async function getAllResumes(): Promise<StoredResume[]> {
+  try {
+    return await invoke<StoredResume[]>("get_all_resumes")
+  } catch (e) {
+    throw mapTauriError(e)
   }
 }
 
-function readAll(): StoredResume[] {
-  ensureClient()
+export async function getResumeById(id: string): Promise<StoredResume | null> {
   try {
-    const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY)
-    if (!raw) return []
-    const parsed = JSON.parse(raw) as StoredResume[]
-    if (!Array.isArray(parsed)) return []
-    return parsed
-  } catch {
-    throw new StorageError("读取本地存储失败，数据格式错误", "PARSE_ERROR")
+    return await invoke<StoredResume | null>("get_resume_by_id", { id })
+  } catch (e) {
+    throw mapTauriError(e)
   }
 }
 
-function writeAll(list: StoredResume[]) {
-  ensureClient()
+export async function upsertResume(entry: StoredResume): Promise<StoredResume> {
   try {
-    window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(list))
-  } catch (e: unknown) {
-    // Safari throws DOMException with code 22, Firefox: 1014, Chrome name: QuotaExceededError
-    const isQuota = (() => {
-      if (typeof e === "object" && e !== null) {
-        const maybe: { name?: unknown; code?: unknown } = e as Record<string, unknown>
-        const name = typeof maybe.name === "string" ? maybe.name : undefined
-        const code = typeof maybe.code === "number" ? maybe.code : undefined
-        return name === "QuotaExceededError" || code === 22 || code === 1014
-      }
-      return false
-    })()
-    if (isQuota) {
-      throw new StorageError("存储容量已满", "QUOTA_EXCEEDED")
+    const existing = await invoke<StoredResume | null>("get_resume_by_id", { id: entry.id })
+    if (existing) {
+      return await invoke<StoredResume>("update_resume", { id: entry.id, data: entry.resumeData })
     }
-    throw new StorageError("写入本地存储失败", "UNKNOWN")
+    return await invoke<StoredResume>("create_resume", { entry })
+  } catch (e) {
+    throw mapTauriError(e)
   }
 }
 
-export function getAllResumes(): StoredResume[] {
-  return readAll()
+export async function getDefaultResumeData(): Promise<ResumeData> {
+  try {
+    return await invoke<ResumeData>("get_default_resume_data")
+  } catch (e) {
+    throw mapTauriError(e)
+  }
 }
 
-export function getResumeById(id: string): StoredResume | null {
-  return readAll().find((r) => r.id === id) || null
+export async function validateResumeDataWithBackend(data: ResumeData): Promise<ResumeValidationResult> {
+  try {
+    return await invoke<ResumeValidationResult>("validate_resume_data_command", { data })
+  } catch (e) {
+    throw mapTauriError(e)
+  }
 }
 
-export function upsertResume(entry: StoredResume): StoredResume {
-  const list = readAll()
-  const idx = list.findIndex((r) => r.id === entry.id)
-  if (idx >= 0) list[idx] = entry
-  else list.unshift(entry)
-  writeAll(list)
-  return entry
+export async function importResumeFile(content: string): Promise<ResumeData> {
+  try {
+    return await invoke<ResumeData>("import_resume_file", { content })
+  } catch (e) {
+    throw mapTauriError(e)
+  }
 }
 
-export function deleteResumes(ids: string[]): void {
-  const set = new Set(ids)
-  const next = readAll().filter((r) => !set.has(r.id))
-  writeAll(next)
+export async function exportResumeFile(data: ResumeData): Promise<string> {
+  try {
+    return await invoke<string>("export_resume_file", { data })
+  } catch (e) {
+    throw mapTauriError(e)
+  }
 }
 
-export function createEntryFromData(data: ResumeData): StoredResume {
-  const now = new Date().toISOString()
-  const id = typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-
-  // Ensure timestamps in data align with entry
-  const normalized: ResumeData = {
-    ...data,
-    createdAt: data.createdAt || now,
-    updatedAt: now,
+export async function createPersonalInfoItem(order = 0): Promise<PersonalInfoItem> {
+  try {
+    return await invoke<PersonalInfoItem>("create_personal_info_item", { order })
+  } catch (e) {
+    throw mapTauriError(e)
   }
-
-  const { isValid, errors } = validateResumeData(normalized)
-  if (!isValid) {
-    throw new StorageError(`简历数据校验失败：${errors.join("；")}`)
-  }
-
-  const entry: StoredResume = {
-    id,
-    createdAt: now,
-    updatedAt: now,
-    resumeData: normalized,
-  }
-  upsertResume(entry)
-  return entry
 }
 
-export function updateEntryData(id: string, data: ResumeData): StoredResume {
-  const list = readAll()
-  const idx = list.findIndex((r) => r.id === id)
-  if (idx < 0) throw new StorageError("未找到对应的简历条目")
-
-  const now = new Date().toISOString()
-  const merged: ResumeData = {
-    ...data,
-    createdAt: list[idx].resumeData.createdAt || list[idx].createdAt,
-    updatedAt: now,
+export async function createJobIntentionItem(
+  type: JobIntentionSection["items"][number]["type"],
+  order: number,
+): Promise<JobIntentionItem> {
+  try {
+    return await invoke<JobIntentionItem>("create_job_intention_item", { itemType: type, order })
+  } catch (e) {
+    throw mapTauriError(e)
   }
+}
 
-  const { isValid, errors } = validateResumeData(merged)
-  if (!isValid) {
-    throw new StorageError(`简历数据校验失败：${errors.join("；")}`)
+export async function createResumeModule(order: number): Promise<ResumeModule> {
+  try {
+    return await invoke<ResumeModule>("create_resume_module", { order })
+  } catch (e) {
+    throw mapTauriError(e)
   }
+}
 
-  const updated: StoredResume = {
-    ...list[idx],
-    updatedAt: now,
-    resumeData: merged,
+export async function createRichTextRow(columns: 1 | 2 | 3 | 4, order: number): Promise<ModuleContentRow> {
+  try {
+    return await invoke<ModuleContentRow>("create_rich_text_row", { columns, order })
+  } catch (e) {
+    throw mapTauriError(e)
   }
-  list[idx] = updated
-  writeAll(list)
-  return updated
+}
+
+export async function createTagsRow(order: number): Promise<ModuleContentRow> {
+  try {
+    return await invoke<ModuleContentRow>("create_tags_row", { order })
+  } catch (e) {
+    throw mapTauriError(e)
+  }
+}
+
+export async function deleteResumes(ids: string[]): Promise<void> {
+  try {
+    await invoke<void>("delete_resumes", { ids })
+  } catch (e) {
+    throw mapTauriError(e)
+  }
+}
+
+export async function createEntryFromData(data: ResumeData): Promise<StoredResume> {
+  try {
+    return await invoke<StoredResume>("create_resume_from_data", { data })
+  } catch (e) {
+    throw mapTauriError(e)
+  }
+}
+
+export async function updateEntryData(id: string, data: ResumeData): Promise<StoredResume> {
+  try {
+    const validation = await validateResumeDataWithBackend(data)
+    if (!validation.isValid) {
+      throw new StorageError(`简历数据校验失败：${validation.errors.join("；")}`)
+    }
+
+    return await invoke<StoredResume>("update_resume", { id, data: validation.normalizedData })
+  } catch (e) {
+    if (e instanceof StorageError) throw e
+    throw mapTauriError(e)
+  }
 }
 
 async function loadTemplateFrom(path: string): Promise<ResumeData | null> {
@@ -142,15 +181,16 @@ async function loadTemplateFrom(path: string): Promise<ResumeData | null> {
     const res = await fetch(path)
     if (!res.ok) return null
     const content = await res.text()
-    const data = importFromMagicyanFile(content)
-    return data
+    return await importResumeFile(content)
   } catch {
     return null
   }
 }
 
-export function loadDefaultTemplate(): Promise<ResumeData | null> {
-  return loadTemplateFrom("/template.json")
+export async function loadDefaultTemplate(): Promise<ResumeData> {
+  const template = await loadTemplateFrom("/template.json")
+  if (template) return template
+  return getDefaultResumeData()
 }
 
 export function loadExampleTemplate(): Promise<ResumeData | null> {

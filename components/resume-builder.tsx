@@ -9,13 +9,15 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@iconify/react"
 import type { ResumeData, EditorState } from "@/types/resume"
-import { createDefaultResumeData } from "@/lib/utils"
 import { loadDefaultTemplate, loadExampleTemplate } from "@/lib/storage"
 import ResumePreview from "./resume-preview"
 import PersonalInfoEditor from "./personal-info-editor"
 import JobIntentionEditor from "./job-intention-editor"
 import ModuleEditor from "./module-editor"
 import ExportButton from "./export-button"
+import { AISettingsDialog } from "./ai-settings-dialog"
+import JDAnalysisSheet from "./jd-analysis-sheet"
+import FullResumeOptimizationDialog from "./full-resume-optimization-dialog"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 type ViewMode = "both" | "edit-only" | "preview-only"
@@ -63,17 +65,39 @@ ViewModeSelector.displayName = "ViewModeSelector"
 /**
  * 简历构建器主组件
  */
-export default function ResumeBuilder({ initialData, template = "default", onChange, onSave, onBack }: { initialData?: ResumeData; template?: "default" | "example"; onChange?: (data: ResumeData) => void; onSave?: (data: ResumeData) => void; onBack?: () => void }) {
-  const [editorState, setEditorState] = useState<EditorState>({
-    resumeData: initialData ?? createDefaultResumeData(),
-    isEditing: true,
-    showPreview: true,
+export default function ResumeBuilder({
+  initialData,
+  template = "default",
+  onChange,
+  onSave,
+  onBack,
+  onCreateTailoredResume,
+  onCreateOptimizedResume,
+}: {
+  initialData?: ResumeData
+  template?: "default" | "example"
+  onChange?: (data: ResumeData) => void
+  onSave?: (data: ResumeData) => void | Promise<void>
+  onBack?: () => void
+  onCreateTailoredResume?: (data: ResumeData) => void | Promise<void>
+  onCreateOptimizedResume?: (data: ResumeData) => void | Promise<void>
+}) {
+  const [editorState, setEditorState] = useState<EditorState | null>(() => {
+    if (!initialData) return null
+    return {
+      resumeData: initialData,
+      isEditing: true,
+      showPreview: true,
+    }
   })
 
   const isMobile = useIsMobile()
   const userOverridden = useRef(false)
 
   const [viewMode, setViewMode] = useState<ViewMode>("both")
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false)
+  const [jdAnalysisOpen, setJdAnalysisOpen] = useState(false)
+  const [fullOptimizeOpen, setFullOptimizeOpen] = useState(false)
 
   useEffect(() => {
     if (userOverridden.current) return
@@ -81,14 +105,23 @@ export default function ResumeBuilder({ initialData, template = "default", onCha
   }, [isMobile])
 
   useEffect(() => {
-    if (initialData) return
+    if (initialData) {
+      setEditorState({
+        resumeData: initialData,
+        isEditing: true,
+        showPreview: true,
+      })
+      return
+    }
+
     const loadTemplate = async () => {
       const tpl = template === "example" ? await loadExampleTemplate() : await loadDefaultTemplate()
       if (!tpl) return
-      setEditorState((prev) => ({
-        ...prev,
+      setEditorState({
         resumeData: tpl,
-      }))
+        isEditing: true,
+        showPreview: true,
+      })
     }
     loadTemplate()
   }, [initialData, template])
@@ -99,20 +132,37 @@ export default function ResumeBuilder({ initialData, template = "default", onCha
   }, [])
 
   const updateResumeData = useCallback((updates: Partial<ResumeData>) => {
-    setEditorState((prev) => ({
-      ...prev,
-      resumeData: {
-        ...prev.resumeData,
-        ...updates,
-        updatedAt: new Date().toISOString(),
-      },
-    }))
+    setEditorState((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        resumeData: {
+          ...prev.resumeData,
+          ...updates,
+          updatedAt: new Date().toISOString(),
+        },
+      }
+    })
   }, [])
 
   // 将变更在提交阶段通知父组件，避免在渲染中更新父组件
   useEffect(() => {
+    if (!editorState) return
     onChange?.(editorState.resumeData)
-  }, [editorState.resumeData, onChange])
+  }, [editorState, onChange])
+
+  if (!editorState) {
+    return (
+      <div className="resume-editor">
+        <div className="editor-toolbar no-print">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Icon icon="mdi:loading" className="w-4 h-4 animate-spin" />
+            正在加载简历模板...
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="resume-editor">
@@ -163,6 +213,36 @@ export default function ResumeBuilder({ initialData, template = "default", onCha
             resumeData={editorState.resumeData}
             size="sm"
           />
+
+          <Separator orientation="vertical" className="h-6" />
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAiSettingsOpen(true)}
+            className="gap-2 bg-transparent"
+          >
+            <Icon icon="mdi:cog-outline" className="w-4 h-4" />
+            AI 设置
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFullOptimizeOpen(true)}
+            className="gap-2 bg-transparent"
+          >
+            <Icon icon="mdi:sparkles" className="w-4 h-4" />
+            一键优化
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setJdAnalysisOpen(true)}
+            className="gap-2 bg-transparent"
+          >
+            <Icon icon="mdi:target" className="w-4 h-4" />
+            JD 匹配
+          </Button>
         </div>
       </div>
 
@@ -232,6 +312,20 @@ export default function ResumeBuilder({ initialData, template = "default", onCha
           </div>
         )}
       </div>
+
+      <AISettingsDialog open={aiSettingsOpen} onOpenChange={setAiSettingsOpen} />
+      <FullResumeOptimizationDialog
+        open={fullOptimizeOpen}
+        onOpenChange={setFullOptimizeOpen}
+        resumeData={editorState.resumeData}
+        onCreateOptimizedResume={onCreateOptimizedResume}
+      />
+      <JDAnalysisSheet
+        open={jdAnalysisOpen}
+        onOpenChange={setJdAnalysisOpen}
+        resumeData={editorState.resumeData}
+        onCreateTailoredResume={onCreateTailoredResume}
+      />
     </div>
   )
 }

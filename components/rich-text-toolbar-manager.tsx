@@ -33,8 +33,8 @@ export function ToolbarProvider({ children }: { children: React.ReactNode }) {
       const start = view.coordsAtPos(from)
       const end = view.coordsAtPos(to)
 
-      const toolbarWidth = 300
-      const toolbarHeight = 80
+      const toolbarWidth = 420
+      const toolbarHeight = 100
 
       // Calculate horizontal position
       let left = (start.left + end.left) / 2 - toolbarWidth / 2
@@ -124,7 +124,7 @@ export function ToolbarProvider({ children }: { children: React.ReactNode }) {
       {children}
       {isClient && showToolbar && activeEditor && createPortal(
         <div
-          className="fixed z-50 rich-text-toolbar"
+          className="fixed z-50 rich-text-toolbar overflow-visible"
           style={{
             top: `${toolbarPosition.top}px`,
             left: `${toolbarPosition.left}px`,

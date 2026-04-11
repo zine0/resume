@@ -33,7 +33,8 @@ import { Icon } from "@iconify/react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import type { DraggableProvidedDragHandleProps } from "@hello-pangea/dnd";
 import type { PersonalInfoItem, PersonalInfoSection, PersonalInfoLayout } from "@/types/resume";
-import { createNewPersonalInfoItem } from "@/lib/utils";
+import { createPersonalInfoItem } from "@/lib/storage";
+import { useToast } from "@/hooks/use-toast";
 import IconPicker from "./icon-picker";
 
 interface PersonalInfoEditorProps {
@@ -50,6 +51,8 @@ export default function PersonalInfoEditor({
   avatar,
   onUpdate,
 }: PersonalInfoEditorProps) {
+  const { toast } = useToast();
+  const [isAddingItem, setIsAddingItem] = useState(false);
   const avatarUrl = avatar || "";
   const showLabels = personalInfoSection?.showPersonalInfoLabels !== false;
   const layout: PersonalInfoLayout = personalInfoSection?.layout ?? { mode: 'grid', itemsPerRow: 2 };
@@ -213,13 +216,25 @@ export default function PersonalInfoEditor({
   /**
    * 添加新的个人信息项
    */
-  const addPersonalInfoItem = () => {
-    if (!personalInfoSection) return;
-    const newItem = createNewPersonalInfoItem();
-    onUpdate({
-      ...personalInfoSection,
-      personalInfo: [...personalInfo, newItem]
-    }, avatarUrl);
+  const addPersonalInfoItem = async () => {
+    if (!personalInfoSection || isAddingItem) return;
+    try {
+      setIsAddingItem(true);
+      const nextOrder = personalInfo.reduce((max, item) => Math.max(max, item.order), -1) + 1;
+      const newItem = await createPersonalInfoItem(nextOrder);
+      onUpdate({
+        ...personalInfoSection,
+        personalInfo: [...personalInfo, newItem]
+      }, avatarUrl);
+    } catch (e) {
+      toast({
+        title: "添加失败",
+        description: e instanceof Error ? e.message : "无法创建新的个人信息项",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAddingItem(false);
+    }
   };
 
   /**
@@ -227,7 +242,12 @@ export default function PersonalInfoEditor({
    */
   const removePersonalInfoItem = (id: string) => {
     if (!personalInfoSection) return;
-    const updatedInfo = personalInfo.filter((item) => item.id !== id);
+    const updatedInfo = personalInfo
+      .filter((item) => item.id !== id)
+      .map((item, index) => ({
+        ...item,
+        order: index,
+      }));
 
     // 如果删除后，当前列数大于剩余项目数，自动调整列数
     const maxCols = Math.max(Math.min(6, updatedInfo.length), 1);
@@ -337,6 +357,7 @@ export default function PersonalInfoEditor({
             size="sm"
             variant="outline"
             onClick={addPersonalInfoItem}
+            disabled={isAddingItem}
             className="gap-2 bg-transparent"
           >
             <Icon icon="mdi:plus" className="w-4 h-4" />

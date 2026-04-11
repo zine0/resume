@@ -29,8 +29,7 @@
         "minWidth": 1024,
         "minHeight": 768,
         "resizable": true,
-        "center": true,
-        "devtools": true
+        "center": true
       }
     ]
   },

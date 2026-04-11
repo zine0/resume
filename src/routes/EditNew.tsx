@@ -1,4 +1,4 @@
-import { Suspense, useMemo } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import ResumeBuilder from "@/components/resume-builder"
 import type { ResumeData } from "@/types/resume"
@@ -34,16 +34,19 @@ function EditNewContent() {
     }
   }, [])
 
-  // 同步派生克隆数据
-  const clonedData: ResumeData | undefined = useMemo(() => {
-    if (!cloneId) return undefined
-    const entry = getResumeById(cloneId)
-    return entry ? { ...entry.resumeData } : undefined
+  // 异步加载克隆数据
+  const [clonedData, setClonedData] = useState<ResumeData | undefined>(undefined)
+
+  useEffect(() => {
+    if (!cloneId) return
+    getResumeById(cloneId).then((entry) => {
+      if (entry) setClonedData({ ...entry.resumeData })
+    })
   }, [cloneId])
 
   const handleSave = async (current: ResumeData) => {
     try {
-      const entry = createEntryFromData(current)
+      const entry = await createEntryFromData(current)
       toast({ title: "保存成功", description: `已创建：${entry.resumeData.title}` })
       navigate(`/edit/${entry.id}`, { replace: true })
     } catch (e: unknown) {
@@ -60,6 +63,11 @@ function EditNewContent() {
     }
   }
 
+  const handleCreateResumeCopy = async (data: ResumeData) => {
+    const entry = await createEntryFromData(data)
+    navigate(`/edit/${entry.id}`)
+  }
+
   return (
     <main className="min-h-screen bg-background">
       <ResumeBuilder
@@ -67,6 +75,8 @@ function EditNewContent() {
         template={useExample ? "example" : "default"}
         onBack={() => navigate("/")}
         onSave={(d) => handleSave(d)}
+        onCreateTailoredResume={(d) => handleCreateResumeCopy(d)}
+        onCreateOptimizedResume={(d) => handleCreateResumeCopy(d)}
       />
     </main>
   )

@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
@@ -10,7 +10,20 @@ import ResumePreview from "@/components/resume-preview"
 export default function ViewResume() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const entry = useMemo<StoredResume | null>(() => (id ? getResumeById(id) : null), [id])
+  const [entry, setEntry] = useState<StoredResume | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!id) { setLoading(false); return }
+    getResumeById(id).then((e) => {
+      setEntry(e)
+      setLoading(false)
+    })
+  }, [id])
+
+  if (loading) {
+    return <main className="min-h-screen bg-background" />
+  }
 
   if (!entry) {
     return (

@@ -1,7 +1,9 @@
 use tauri::Manager;
 
-mod storage;
+mod ai_config;
 mod pdf;
+mod resume;
+mod storage;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -9,9 +11,21 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            ai_config::get_ai_config,
+            ai_config::save_ai_config,
+            resume::get_default_resume_data,
+            resume::validate_resume_data_command,
+            resume::import_resume_file,
+            resume::export_resume_file,
+            resume::create_personal_info_item,
+            resume::create_job_intention_item,
+            resume::create_resume_module,
+            resume::create_rich_text_row,
+            resume::create_tags_row,
             storage::get_all_resumes,
             storage::get_resume_by_id,
             storage::create_resume,
+            storage::create_resume_from_data,
             storage::update_resume,
             storage::delete_resumes,
             pdf::generate_pdf,

@@ -3,9 +3,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Icon } from "@iconify/react"
 import type { Editor } from '@tiptap/react'
 import { useColorPicker } from "@/components/color-picker-manager"
+import { useToast } from "@/hooks/use-toast"
+import { getAIConfig } from "@/lib/ai-config"
+import { AIService } from "@/lib/ai-service"
+import type { PolishMode } from "@/types/ai"
 
 // Supported fonts
 const FONT_FAMILIES = [
@@ -47,7 +52,10 @@ export default function RichTextToolbar({ editor }: RichTextToolbarProps) {
   const [colorPickerOpen, setColorPickerOpen] = useState(false)
   const [linkDialogOpen, setLinkDialogOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiMenuOpen, setAiMenuOpen] = useState(false)
   const { openColorPicker } = useColorPicker()
+  const { toast } = useToast()
   const savedSelectionRef = useRef<{ from: number; to: number } | null>(null)
 
   // Save selection when toolbar is shown and update it whenever selection changes
@@ -159,6 +167,36 @@ export default function RichTextToolbar({ editor }: RichTextToolbarProps) {
     chain.run()
   }
 
+  const handleAIPolish = async (mode: PolishMode) => {
+    setAiMenuOpen(false)
+
+    if (!savedSelectionRef.current) return
+    const { from, to } = savedSelectionRef.current
+    const selectedText = editor.state.doc.textBetween(from, to, "\n")
+    if (!selectedText.trim()) {
+      toast({ title: "请先选择要优化的文字" })
+      return
+    }
+
+    const config = await getAIConfig()
+    if (!config || !config.apiKey) {
+      toast({ title: "请先配置 AI 设置", description: "在工具栏中点击 AI 设置按钮配置 API Key", variant: "destructive" })
+      return
+    }
+
+    setAiLoading(true)
+    try {
+      const ai = new AIService(config)
+      const result = await ai.polishText(selectedText, mode)
+      restoreSavedSelection()
+      editor.chain().focus().deleteSelection().insertContent(result).run()
+    } catch (e) {
+      toast({ title: "AI 处理失败", description: e instanceof Error ? e.message : "未知错误", variant: "destructive" })
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
   // Get current font family
   const getCurrentFontFamily = () => {
     const fontFamily = editor.getAttributes('textStyle').fontFamily
@@ -180,7 +218,7 @@ export default function RichTextToolbar({ editor }: RichTextToolbarProps) {
   }
 
   return (
-    <div className="bg-white text-slate-800 rounded shadow-lg p-1.5 space-y-1 min-w-[300px] text-xs border border-slate-200">
+    <div className="bg-white text-slate-800 rounded shadow-lg p-1.5 space-y-1 min-w-[420px] text-xs border border-slate-200 overflow-visible">
       {/* Row 1: Font and Size */}
       <div className="flex items-center gap-1">
         <Select
@@ -525,11 +563,67 @@ export default function RichTextToolbar({ editor }: RichTextToolbarProps) {
           variant="ghost"
           className="h-6 w-6 p-0 hover:bg-slate-100"
           title="清除格式"
-          onMouseDown={(e) => { e.preventDefault(); const { from, to } = editor.state.selection; savedSelectionRef.current = { from, to } }}
+          onMouseDown={(e) => {
+            e.preventDefault()
+            const { from, to } = editor.state.selection
+            savedSelectionRef.current = { from, to }
+          }}
           onClick={clearFormatting}
         >
           <Icon icon="mdi:format-clear" className="w-3 h-3" />
         </Button>
+
+        <div className="w-px h-4 bg-slate-300 mx-0.5" />
+
+        <DropdownMenu open={aiMenuOpen} onOpenChange={setAiMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 hover:bg-purple-50"
+              title="AI 助手"
+              disabled={aiLoading}
+              onPointerDown={(e) => {
+                e.preventDefault()
+                const { from, to } = editor.state.selection
+                savedSelectionRef.current = { from, to }
+              }}
+              onClick={() => {
+                if (!aiLoading) {
+                  setAiMenuOpen((open) => !open)
+                }
+              }}
+            >
+              {aiLoading ? (
+                <Icon icon="mdi:loading" className="w-3 h-3 animate-spin text-purple-500" />
+              ) : (
+                <Icon icon="mdi:auto-fix" className="w-3 h-3 text-purple-500" />
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem onSelect={() => void handleAIPolish("polish")}>
+              <Icon icon="mdi:auto-fix" className="w-4 h-4 mr-2" />
+              润色优化
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void handleAIPolish("expand")}>
+              <Icon icon="mdi:text-box-plus" className="w-4 h-4 mr-2" />
+              扩写内容
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void handleAIPolish("shorten")}>
+              <Icon icon="mdi:text-box-minus" className="w-4 h-4 mr-2" />
+              精简内容
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void handleAIPolish("translate_en")}>
+              <Icon icon="mdi:translate" className="w-4 h-4 mr-2" />
+              翻译为英文
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void handleAIPolish("translate_zh")}>
+              <Icon icon="mdi:translate" className="w-4 h-4 mr-2" />
+              翻译为中文
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   )

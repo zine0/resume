@@ -1,22 +1,26 @@
+use crate::resume::{validate_resume_data_or_error, ResumeData, StoredResume};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use tauri::Manager;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct StoredResume {
-    pub id: String,
-    #[serde(rename = "createdAt")]
-    pub created_at: String,
-    #[serde(rename = "updatedAt")]
-    pub updated_at: String,
-    #[serde(rename = "resumeData")]
-    pub resume_data: serde_json::Value,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 struct StorageData {
     entries: Vec<StoredResume>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LegacyStoredResume {
+    id: String,
+    created_at: String,
+    updated_at: String,
+    resume_data: serde_json::Value,
+}
+
+#[derive(Debug, Deserialize)]
+struct LegacyStorageData {
+    entries: Vec<LegacyStoredResume>,
 }
 
 fn data_dir(app: &tauri::AppHandle) -> PathBuf {
@@ -29,13 +33,57 @@ fn storage_file(app: &tauri::AppHandle) -> PathBuf {
     data_dir(app).join("resumes.json")
 }
 
-fn read_storage(app: &tauri::AppHandle) -> StorageData {
+fn read_storage(app: &tauri::AppHandle) -> Result<StorageData, String> {
     let path = storage_file(app);
     if !path.exists() {
-        return StorageData { entries: vec![] };
+        return Ok(StorageData { entries: vec![] });
     }
-    let content = fs::read_to_string(&path).unwrap_or_default();
-    serde_json::from_str(&content).unwrap_or(StorageData { entries: vec![] })
+    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    if let Ok(storage) = serde_json::from_str::<StorageData>(&content) {
+        return Ok(storage);
+    }
+
+    let legacy = match serde_json::from_str::<LegacyStorageData>(&content) {
+        Ok(storage) => storage,
+        Err(_) => {
+            return Err(
+                "读取本地简历数据失败：存储文件格式无法识别，请先备份当前数据文件。".to_string(),
+            )
+        }
+    };
+
+    let entries = legacy
+        .entries
+        .into_iter()
+        .map(|entry| {
+            let mut resume_data: ResumeData = serde_json::from_value(entry.resume_data)
+                .map_err(|_| format!("读取旧版简历失败：{} 的数据格式错误", entry.id))?;
+
+            if !entry.created_at.trim().is_empty() {
+                resume_data.created_at = entry.created_at.clone();
+            }
+            if !entry.updated_at.trim().is_empty() {
+                resume_data.updated_at = entry.updated_at.clone();
+            }
+
+            let mut resume_data = validate_resume_data_or_error(resume_data)?;
+            if !entry.created_at.trim().is_empty() {
+                resume_data.created_at = entry.created_at.clone();
+            }
+            if !entry.updated_at.trim().is_empty() {
+                resume_data.updated_at = entry.updated_at.clone();
+            }
+
+            Ok(StoredResume {
+                id: entry.id,
+                created_at: entry.created_at,
+                updated_at: entry.updated_at,
+                resume_data,
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
+    Ok(StorageData { entries })
 }
 
 fn write_storage(app: &tauri::AppHandle, data: &StorageData) -> Result<(), String> {
@@ -44,38 +92,86 @@ fn write_storage(app: &tauri::AppHandle, data: &StorageData) -> Result<(), Strin
     fs::write(path, json).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
-pub fn get_all_resumes(app: tauri::AppHandle) -> Vec<StoredResume> {
-    read_storage(&app).entries
+fn build_new_entry_from_data(data: ResumeData) -> Result<StoredResume, String> {
+    let now = chrono::Utc::now().to_rfc3339();
+    let id = uuid::Uuid::new_v4().to_string();
+    let mut resume_data = validate_resume_data_or_error(data)?;
+    resume_data.created_at = now.clone();
+    resume_data.updated_at = now.clone();
+
+    Ok(StoredResume {
+        id,
+        created_at: now.clone(),
+        updated_at: now,
+        resume_data,
+    })
 }
 
 #[tauri::command]
-pub fn get_resume_by_id(app: tauri::AppHandle, id: String) -> Option<StoredResume> {
-    read_storage(&app).entries.into_iter().find(|e| e.id == id)
+pub fn get_all_resumes(app: tauri::AppHandle) -> Result<Vec<StoredResume>, String> {
+    Ok(read_storage(&app)?.entries)
+}
+
+#[tauri::command]
+pub fn get_resume_by_id(app: tauri::AppHandle, id: String) -> Result<Option<StoredResume>, String> {
+    Ok(read_storage(&app)?.entries.into_iter().find(|e| e.id == id))
 }
 
 #[tauri::command]
 pub fn create_resume(app: tauri::AppHandle, entry: StoredResume) -> Result<StoredResume, String> {
-    let mut storage = read_storage(&app);
-    storage.entries.insert(0, entry.clone());
+    let mut storage = read_storage(&app)?;
+    let now = chrono::Utc::now().to_rfc3339();
+    let mut created = entry;
+    if created.created_at.trim().is_empty() {
+        created.created_at = now.clone();
+    }
+    created.updated_at = now;
+
+    let mut resume_data = validate_resume_data_or_error(created.resume_data)?;
+    resume_data.created_at = created.created_at.clone();
+    resume_data.updated_at = created.updated_at.clone();
+    created.resume_data = resume_data;
+
+    storage.entries.insert(0, created.clone());
     write_storage(&app, &storage)?;
-    Ok(entry)
+    Ok(created)
+}
+
+#[tauri::command]
+pub fn create_resume_from_data(
+    app: tauri::AppHandle,
+    data: ResumeData,
+) -> Result<StoredResume, String> {
+    let mut storage = read_storage(&app)?;
+    let created = build_new_entry_from_data(data)?;
+    storage.entries.insert(0, created.clone());
+    write_storage(&app, &storage)?;
+    Ok(created)
 }
 
 #[tauri::command]
 pub fn update_resume(
     app: tauri::AppHandle,
     id: String,
-    data: serde_json::Value,
+    data: ResumeData,
 ) -> Result<StoredResume, String> {
-    let mut storage = read_storage(&app);
+    let mut storage = read_storage(&app)?;
     let entry = storage
         .entries
         .iter_mut()
         .find(|e| e.id == id)
         .ok_or("Resume not found".to_string())?;
-    entry.resume_data = data;
+
+    let mut resume_data = validate_resume_data_or_error(data)?;
+    resume_data.created_at = if entry.resume_data.created_at.trim().is_empty() {
+        entry.created_at.clone()
+    } else {
+        entry.resume_data.created_at.clone()
+    };
     entry.updated_at = chrono::Utc::now().to_rfc3339();
+    resume_data.updated_at = entry.updated_at.clone();
+    entry.resume_data = resume_data;
+
     let updated = entry.clone();
     write_storage(&app, &storage)?;
     Ok(updated)
@@ -83,7 +179,7 @@ pub fn update_resume(
 
 #[tauri::command]
 pub fn delete_resumes(app: tauri::AppHandle, ids: Vec<String>) -> Result<(), String> {
-    let mut storage = read_storage(&app);
+    let mut storage = read_storage(&app)?;
     let id_set: std::collections::HashSet<String> = ids.into_iter().collect();
     storage.entries.retain(|e| !id_set.contains(&e.id));
     write_storage(&app, &storage)
