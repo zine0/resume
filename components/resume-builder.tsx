@@ -250,65 +250,69 @@ export default function ResumeBuilder({
       <div className="editor-content">
         {/* 编辑面板 */}
         {(viewMode === "both" || viewMode === "edit-only") && (
-          <div className={`editor-panel no-print ${viewMode === "edit-only" ? "w-full" : ""}`}>
-            <div className="p-6 space-y-6">
-              {/* 简历标题编辑 */}
-              <Card className="p-4">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Icon icon="mdi:format-title" className="w-5 h-5 text-primary" />
-                      <h2 className="font-medium">简历标题</h2>
+          <div className={`editor-panel no-print ${viewMode === "edit-only" ? "w-full flex justify-center" : ""}`}>
+            <div className={viewMode === "edit-only" ? "w-[210mm] max-w-full h-full overflow-y-auto" : ""}>
+              <div className="p-6 space-y-6">
+                {/* 简历标题编辑 */}
+                <Card className="p-4">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Icon icon="mdi:format-title" className="w-5 h-5 text-primary" />
+                        <h2 className="font-medium">简历标题</h2>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => updateResumeData({ centerTitle: !editorState.resumeData.centerTitle })}
+                        className="gap-2 bg-transparent"
+                      >
+                        <Icon icon={editorState.resumeData.centerTitle ? "mdi:format-align-center" : "mdi:format-align-left"} className="w-4 h-4" />
+                        {editorState.resumeData.centerTitle ? "居中显示" : "左对齐"}
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => updateResumeData({ centerTitle: !editorState.resumeData.centerTitle })}
-                      className="gap-2 bg-transparent"
-                    >
-                      <Icon icon={editorState.resumeData.centerTitle ? "mdi:format-align-center" : "mdi:format-align-left"} className="w-4 h-4" />
-                      {editorState.resumeData.centerTitle ? "居中显示" : "左对齐"}
-                    </Button>
+                    <Input
+                      value={editorState.resumeData.title}
+                      onChange={(e) => updateResumeData({ title: e.target.value })}
+                      placeholder="请输入简历标题或姓名"
+                      className="text-lg font-medium"
+                    />
                   </div>
-                  <Input
-                    value={editorState.resumeData.title}
-                    onChange={(e) => updateResumeData({ title: e.target.value })}
-                    placeholder="请输入简历标题或姓名"
-                    className="text-lg font-medium"
-                  />
-                </div>
-              </Card>
+                </Card>
 
-              {/* 求职意向编辑 */}
-              <JobIntentionEditor
-                jobIntentionSection={editorState.resumeData.jobIntentionSection}
-                onUpdate={(jobIntentionSection) => updateResumeData({ jobIntentionSection })}
-              />
+                {/* 求职意向编辑 */}
+                <JobIntentionEditor
+                  jobIntentionSection={editorState.resumeData.jobIntentionSection}
+                  onUpdate={(jobIntentionSection) => updateResumeData({ jobIntentionSection })}
+                />
 
-              {/* 个人信息编辑 */}
-              <PersonalInfoEditor
-                personalInfoSection={editorState.resumeData.personalInfoSection}
-                avatar={editorState.resumeData.avatar}
-                onUpdate={(personalInfoSection, avatar) => {
-                  const updates: Partial<ResumeData> = { personalInfoSection }
-                  if (avatar !== undefined) updates.avatar = avatar
-                  updateResumeData(updates)
-                }}
-              />
+                {/* 个人信息编辑 */}
+                <PersonalInfoEditor
+                  personalInfoSection={editorState.resumeData.personalInfoSection}
+                  avatar={editorState.resumeData.avatar}
+                  onUpdate={(personalInfoSection, avatar) => {
+                    const updates: Partial<ResumeData> = { personalInfoSection }
+                    if (avatar !== undefined) updates.avatar = avatar
+                    updateResumeData(updates)
+                  }}
+                />
 
-              {/* 简历模块编辑 */}
-              <ModuleEditor
-                modules={editorState.resumeData.modules}
-                onUpdate={(modules) => updateResumeData({ modules })}
-              />
+                {/* 简历模块编辑 */}
+                <ModuleEditor
+                  modules={editorState.resumeData.modules}
+                  onUpdate={(modules) => updateResumeData({ modules })}
+                />
+              </div>
             </div>
           </div>
         )}
 
         {/* 预览面板 */}
         {(viewMode === "both" || viewMode === "preview-only") && (
-          <div className={`preview-panel ${viewMode === "preview-only" ? "w-full" : ""}`}>
-            <ResumePreview resumeData={editorState.resumeData} />
+          <div className={`preview-panel ${viewMode === "preview-only" ? "w-full flex justify-center p-6 md:p-8" : ""}`}>
+            <div className={viewMode === "preview-only" ? "w-[210mm] max-w-full min-h-full bg-white shadow-sm" : ""}>
+              <ResumePreview resumeData={editorState.resumeData} />
+            </div>
           </div>
         )}
       </div>

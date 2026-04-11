@@ -49,8 +49,8 @@ export default function ViewResume() {
         </div>
       </div>
       <Separator />
-      <div className="p-4">
-        <div className="preview-panel w-full">
+      <div className="flex justify-center p-6 md:p-8">
+        <div className="w-[210mm] max-w-full bg-white shadow-sm">
           <ResumePreview resumeData={entry.resumeData} />
         </div>
       </div>
