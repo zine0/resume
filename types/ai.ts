@@ -5,12 +5,39 @@ export interface AIConfig {
   model: string
 }
 
-export interface AIMessage {
-  role: "system" | "user" | "assistant"
-  content: string
+export type PolishMode = "polish" | "expand" | "shorten" | "translate_en" | "translate_zh"
+
+export type AiPatchTargetKind =
+  | "resumeTitle"
+  | "personalInfo"
+  | "jobIntention"
+  | "moduleElement"
+  | "moduleTags"
+
+export type AiPatchContentKind = "plain" | "markdown" | "tags" | "salary"
+
+export interface SalaryRangeValue {
+  min?: number
+  max?: number
 }
 
-export type PolishMode = "polish" | "expand" | "shorten" | "translate_en" | "translate_zh"
+export interface AiPatchOperation {
+  targetKind: AiPatchTargetKind
+  targetId: string
+  contentKind: AiPatchContentKind
+  text?: string
+  tags?: string[]
+  salaryRange?: SalaryRangeValue
+}
+
+export interface AiResumePatch {
+  operations: AiPatchOperation[]
+  warnings: string[]
+}
+
+export interface AiPolishTextResult {
+  text: string
+}
 
 export interface JDAnalysisSuggestion {
   section: string
@@ -18,6 +45,11 @@ export interface JDAnalysisSuggestion {
   originalText: string
   suggestedText: string
   reason: string
+  targetKind?: AiPatchTargetKind
+  targetId?: string
+  contentKind: AiPatchContentKind
+  tags?: string[]
+  salaryRange?: SalaryRangeValue
 }
 
 export interface JDAnalysisResult {
@@ -26,6 +58,12 @@ export interface JDAnalysisResult {
   matchedKeywords: string[]
   suggestions: JDAnalysisSuggestion[]
   summary: string
+  patch: AiResumePatch
+}
+
+export interface AiRewriteForJdResult {
+  suggestion?: JDAnalysisSuggestion
+  patch: AiResumePatch
 }
 
 export const AI_PRESETS: Record<

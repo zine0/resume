@@ -19,14 +19,19 @@ fn config_file(app: &tauri::AppHandle) -> std::path::PathBuf {
         .join("ai-config.json")
 }
 
+pub fn load_ai_config(app: &tauri::AppHandle) -> Result<AIConfig, String> {
+    let path = config_file(app);
+    if !path.exists() {
+        return Err("请先配置 AI 设置".to_string());
+    }
+
+    let content = fs::read_to_string(&path).map_err(|error| error.to_string())?;
+    serde_json::from_str(&content).map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub fn get_ai_config(app: tauri::AppHandle) -> Option<AIConfig> {
-    let path = config_file(&app);
-    if !path.exists() {
-        return None;
-    }
-    let content = fs::read_to_string(&path).ok()?;
-    serde_json::from_str(&content).ok()
+    load_ai_config(&app).ok()
 }
 
 #[tauri::command]

@@ -22,7 +22,7 @@ import { Icon } from "@iconify/react"
 import type { AIConfig } from "@/types/ai"
 import { AI_PRESETS } from "@/types/ai"
 import { getAIConfig, saveAIConfig } from "@/lib/ai-config"
-import { AIService } from "@/lib/ai-service"
+import { aiTestConnection } from "@/lib/ai-service"
 import { useToast } from "@/hooks/use-toast"
 
 interface AISettingsDialogProps {
@@ -132,13 +132,13 @@ export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) 
 
     setTesting(true)
     try {
-      const service = new AIService({
+      await saveAIConfig({
         provider,
         baseUrl: baseUrl.trim(),
         apiKey: apiKey.trim(),
         model: model.trim(),
       })
-      await service.polishText("你好", "polish")
+      await aiTestConnection()
       toast({ title: "连接成功", description: "AI 服务已就绪" })
     } catch (err) {
       const message = err instanceof Error ? err.message : "未知错误"

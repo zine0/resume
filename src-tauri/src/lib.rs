@@ -1,5 +1,6 @@
 use tauri::Manager;
 
+mod ai_service;
 mod ai_config;
 mod pdf;
 mod resume;
@@ -11,6 +12,11 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
+            ai_service::ai_polish_text,
+            ai_service::ai_optimize_resume,
+            ai_service::ai_analyze_jd,
+            ai_service::ai_rewrite_for_jd,
+            ai_service::ai_test_connection,
             ai_config::get_ai_config,
             ai_config::save_ai_config,
             resume::get_default_resume_data,

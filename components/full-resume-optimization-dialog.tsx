@@ -11,8 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
-import { getAIConfig } from "@/lib/ai-config"
-import { AIService } from "@/lib/ai-service"
+import { aiOptimizeResume, applyAiPatchToResumeData } from "@/lib/ai-service"
 import type { ResumeData } from "@/types/resume"
 
 interface FullResumeOptimizationDialogProps {
@@ -37,21 +36,15 @@ export default function FullResumeOptimizationDialog({
       return
     }
 
-    const config = await getAIConfig()
-    if (!config?.apiKey) {
-      toast({ title: "请先配置 AI 设置", variant: "destructive" })
-      return
-    }
-
     setOptimizing(true)
     try {
-      const service = new AIService(config)
-      const outcome = await service.optimizeResume(resumeData)
-      await onCreateOptimizedResume(outcome.resumeData)
+      const patch = await aiOptimizeResume(resumeData)
+      const { data } = applyAiPatchToResumeData(resumeData, patch)
+      await onCreateOptimizedResume(data)
       toast({
-        title: outcome.warnings.length > 0 ? "已生成优化副本（含保留项）" : "已生成优化副本",
-        description: outcome.warnings.length > 0
-          ? outcome.warnings.slice(0, 2).join(" ")
+        title: patch.warnings.length > 0 ? "已生成优化副本（含保留项）" : "已生成优化副本",
+        description: patch.warnings.length > 0
+          ? patch.warnings.slice(0, 2).join(" ")
           : "优化后的简历已另存为新副本，当前简历未被覆盖。",
       })
       onOpenChange(false)

@@ -13,301 +13,19 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@iconify/react"
 import { useToast } from "@/hooks/use-toast"
-import { getAIConfig } from "@/lib/ai-config"
-import { AIService } from "@/lib/ai-service"
-import type { JSONContent, ModuleContentRow, ResumeData, ResumeModule } from "@/types/resume"
-import type { JDAnalysisResult, JDAnalysisSuggestion } from "@/types/ai"
+import {
+  aiAnalyzeJD,
+  applyAiPatchToResumeData,
+  JD_SUGGESTION_MODULE_TITLE,
+} from "@/lib/ai-service"
+import type { ResumeData } from "@/types/resume"
+import type { JDAnalysisResult } from "@/types/ai"
 
 interface JDAnalysisSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   resumeData: ResumeData
   onCreateTailoredResume?: (data: ResumeData) => Promise<void> | void
-}
-
-interface TailorResult {
-  data: ResumeData
-  appliedCount: number
-  unmatchedCount: number
-}
-
-function extractText(content: unknown): string {
-  if (!content) return ""
-  if (typeof content === "string") return content
-  if (Array.isArray(content)) return content.map(extractText).join("")
-  if (typeof content === "object" && content !== null) {
-    const obj = content as Record<string, unknown>
-    if (obj.type === "hardBreak") return "\n"
-    if (obj.type === "text") return String(obj.text || "")
-    if (obj.content) return extractText(obj.content)
-  }
-  return ""
-}
-
-function resumeToText(data: ResumeData): string {
-  const lines: string[] = []
-
-  lines.push(`【简历标题】${data.title}`)
-  lines.push("")
-
-  if (data.personalInfoSection?.personalInfo?.length) {
-    lines.push("【个人信息】")
-    for (const item of data.personalInfoSection.personalInfo) {
-      lines.push(`  ${item.label}: ${item.value.content}`)
-    }
-    lines.push("")
-  }
-
-  if (data.jobIntentionSection?.enabled && data.jobIntentionSection.items?.length) {
-    lines.push("【求职意向】")
-    for (const item of data.jobIntentionSection.items) {
-      if (item.type === "salary" && item.salaryRange) {
-        const { min, max } = item.salaryRange
-        lines.push(`  ${item.label}: ${min ?? ""}K-${max ?? ""}K`)
-      } else {
-        lines.push(`  ${item.label}: ${item.value}`)
-      }
-    }
-    lines.push("")
-  }
-
-  for (const mod of data.modules) {
-    lines.push(`【${mod.title}】`)
-    for (const row of mod.rows) {
-      if (row.type === "tags" && row.tags?.length) {
-        lines.push(`  标签: ${row.tags.join(", ")}`)
-      } else {
-        const rowText = row.elements
-          .map((el) => extractText(el.content))
-          .filter(Boolean)
-          .join(" | ")
-        if (rowText) lines.push(`  ${rowText}`)
-      }
-    }
-    lines.push("")
-  }
-
-  return lines.join("\n")
-}
-
-function normalizeText(text: string): string {
-  return text.replace(/\s+/g, "").trim().toLowerCase()
-}
-
-function textToRichContent(text: string): JSONContent {
-  const lines = text.replace(/\r\n?/g, "\n").split("\n")
-  return {
-    type: "doc",
-    content: lines.map((line) => (
-      line
-        ? { type: "paragraph", content: [{ type: "text", text: line }] }
-        : { type: "paragraph", content: [] }
-    )),
-  }
-}
-
-function cloneResumeData(data: ResumeData): ResumeData {
-  return typeof structuredClone === "function"
-    ? structuredClone(data)
-    : JSON.parse(JSON.stringify(data)) as ResumeData
-}
-
-function buildTailoredTitle(title: string): string {
-  return /JD定制版/.test(title) ? title : `${title} - JD定制版`
-}
-
-function parseSalaryRange(text: string): { min?: number; max?: number } | null {
-  const matches = Array.from(text.matchAll(/\d+/g)).map((match) => Number.parseInt(match[0], 10))
-  if (matches.length === 0 || matches.some(Number.isNaN)) {
-    return null
-  }
-
-  if (matches.length === 1) {
-    if (/[起以上上]/.test(text)) {
-      return { min: matches[0] }
-    }
-    if (/[以下内]/.test(text)) {
-      return { max: matches[0] }
-    }
-    return { min: matches[0] }
-  }
-
-  return {
-    min: Math.min(matches[0], matches[1]),
-    max: Math.max(matches[0], matches[1]),
-  }
-}
-
-function matchesSuggestionTarget(targetText: string, suggestion: JDAnalysisSuggestion): boolean {
-  const normalizedTarget = normalizeText(targetText)
-  const original = normalizeText(suggestion.originalText || "")
-  const field = normalizeText(suggestion.field || "")
-
-  if (normalizedTarget && original && (normalizedTarget.includes(original) || original.includes(normalizedTarget))) {
-    return true
-  }
-
-  if (normalizedTarget && field && normalizedTarget.includes(field)) {
-    return true
-  }
-
-  return false
-}
-
-function replaceInModule(module: ResumeModule, suggestion: JDAnalysisSuggestion): boolean {
-  const normalizedSection = normalizeText(suggestion.section)
-  const normalizedTitle = normalizeText(module.title)
-  const sectionMatches = normalizedSection
-    ? normalizedTitle.includes(normalizedSection) || normalizedSection.includes(normalizedTitle)
-    : false
-
-  if (!sectionMatches) {
-    return false
-  }
-
-  for (const row of module.rows) {
-    if (row.type === "tags") {
-      const tagsText = row.tags?.join(", ") || ""
-      if (matchesSuggestionTarget(tagsText, suggestion)) {
-        row.type = "rich"
-        row.tags = undefined
-        row.columns = 1
-        row.elements = [{
-          id: `${row.id}-jd-tailored`,
-          columnIndex: 0,
-          content: textToRichContent(suggestion.suggestedText),
-        }]
-        return true
-      }
-      continue
-    }
-
-    for (const element of row.elements) {
-      const elementText = extractText(element.content)
-      if (matchesSuggestionTarget(elementText, suggestion)) {
-        element.content = textToRichContent(suggestion.suggestedText)
-        return true
-      }
-    }
-  }
-
-  const newRow: ModuleContentRow = {
-    id: `${module.id}-jd-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    type: "rich",
-    columns: 1,
-    order: module.rows.length,
-    elements: [{
-      id: `${module.id}-jd-element-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      columnIndex: 0,
-      content: textToRichContent(suggestion.suggestedText),
-    }],
-  }
-
-  module.rows = [...module.rows, newRow]
-  return true
-}
-
-function applySuggestionsToResume(resumeData: ResumeData, result: JDAnalysisResult): TailorResult {
-  const next = cloneResumeData(resumeData)
-  const now = new Date().toISOString()
-  next.title = buildTailoredTitle(next.title)
-  next.createdAt = now
-  next.updatedAt = now
-
-  let appliedCount = 0
-  const unmatched: JDAnalysisSuggestion[] = []
-
-  for (const suggestion of result.suggestions) {
-    let applied = false
-    const sectionKey = normalizeText(suggestion.section)
-    const fieldKey = normalizeText(suggestion.field || "")
-
-    if (sectionKey.includes("个人信息")) {
-      const item = next.personalInfoSection.personalInfo.find((info) => (
-        (fieldKey ? normalizeText(info.label).includes(fieldKey) : false)
-        || matchesSuggestionTarget(info.value.content, suggestion)
-      ))
-      if (item) {
-        item.value.content = suggestion.suggestedText
-        applied = true
-      }
-    }
-
-    if (!applied && sectionKey.includes("求职意向") && next.jobIntentionSection?.items?.length) {
-      const item = next.jobIntentionSection.items.find((job) => (
-        (fieldKey ? normalizeText(job.label).includes(fieldKey) : false)
-        || matchesSuggestionTarget(job.value, suggestion)
-      ))
-      if (item) {
-        if (item.type === "salary") {
-          const parsedRange = parseSalaryRange(suggestion.suggestedText)
-          if (parsedRange) {
-            item.salaryRange = parsedRange
-            item.value = suggestion.suggestedText
-            applied = true
-          }
-        } else {
-          item.value = suggestion.suggestedText
-          applied = true
-        }
-      }
-    }
-
-    if (!applied) {
-      const module = next.modules.find((candidate) => (
-        sectionKey
-          ? normalizeText(candidate.title).includes(sectionKey)
-            || sectionKey.includes(normalizeText(candidate.title))
-          : false
-      ))
-      if (module) {
-        applied = replaceInModule(module, suggestion)
-      }
-    }
-
-    if (applied) {
-      appliedCount += 1
-    } else {
-      unmatched.push(suggestion)
-    }
-  }
-
-  if (unmatched.length > 0) {
-    const existingSuggestionModule = next.modules.find((module) => module.title === "JD 定制建议")
-    const unmatchedRows = unmatched.map((suggestion, index) => ({
-      id: `jd-tailoring-row-${Date.now()}-${index}`,
-      type: "rich" as const,
-      columns: 1 as const,
-      order: index,
-      elements: [{
-        id: `jd-tailoring-element-${Date.now()}-${index}`,
-        columnIndex: 0,
-        content: textToRichContent(`${suggestion.section}${suggestion.field ? ` · ${suggestion.field}` : ""}\n${suggestion.suggestedText}`),
-      }],
-    }))
-
-    if (existingSuggestionModule) {
-      existingSuggestionModule.rows = [
-        ...existingSuggestionModule.rows,
-        ...unmatchedRows.map((row, index) => ({
-          ...row,
-          order: existingSuggestionModule.rows.length + index,
-        })),
-      ]
-    } else {
-    next.modules = [
-      ...next.modules,
-      {
-        id: `jd-tailoring-${Date.now()}`,
-        title: "JD 定制建议",
-        order: next.modules.length,
-        rows: unmatchedRows,
-      },
-    ]
-    }
-  }
-
-  return { data: next, appliedCount, unmatchedCount: unmatched.length }
 }
 
 export default function JDAnalysisSheet({
@@ -328,18 +46,10 @@ export default function JDAnalysisSheet({
       return
     }
 
-    const config = await getAIConfig()
-    if (!config) {
-      toast({ title: "请先配置 AI 设置", variant: "destructive" })
-      return
-    }
-
     setAnalyzing(true)
     setAnalysisResult(null)
     try {
-      const service = new AIService(config)
-      const resumeText = resumeToText(resumeData)
-      const result = await service.analyzeJD(jdText.trim(), resumeText)
+      const result = await aiAnalyzeJD(resumeData, jdText.trim())
       setAnalysisResult(result)
     } catch (err) {
       const message = err instanceof Error ? err.message : "分析失败"
@@ -371,13 +81,17 @@ export default function JDAnalysisSheet({
 
     setCreatingCopy(true)
     try {
-      const tailored = applySuggestionsToResume(resumeData, analysisResult)
-      await onCreateTailoredResume(tailored.data)
+      const { data, appliedCount, unmatchedCount } = applyAiPatchToResumeData(
+        resumeData,
+        analysisResult.patch,
+        { fallbackModuleTitle: JD_SUGGESTION_MODULE_TITLE },
+      )
+      await onCreateTailoredResume(data)
       toast({
         title: "已生成 JD 定制副本",
-        description: tailored.unmatchedCount > 0
-          ? `已应用 ${tailored.appliedCount} 条建议，另外 ${tailored.unmatchedCount} 条已附加到“JD 定制建议”模块。`
-          : `已应用 ${tailored.appliedCount} 条建议，当前简历未被覆盖。`,
+        description: unmatchedCount > 0
+          ? `已应用 ${appliedCount} 条建议，另外 ${unmatchedCount} 条已附加到"${JD_SUGGESTION_MODULE_TITLE}"模块。`
+          : `已应用 ${appliedCount} 条建议，当前简历未被覆盖。`,
       })
       onOpenChange(false)
     } catch (err) {

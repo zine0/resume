@@ -9,7 +9,8 @@ import type { Editor } from '@tiptap/react'
 import { useColorPicker } from "@/components/color-picker-manager"
 import { useToast } from "@/hooks/use-toast"
 import { getAIConfig } from "@/lib/ai-config"
-import { AIService } from "@/lib/ai-service"
+import { aiPolishText } from "@/lib/ai-service"
+import { markdownToRichContent } from "@/lib/markdown"
 import type { PolishMode } from "@/types/ai"
 
 // Supported fonts
@@ -186,10 +187,10 @@ export default function RichTextToolbar({ editor }: RichTextToolbarProps) {
 
     setAiLoading(true)
     try {
-      const ai = new AIService(config)
-      const result = await ai.polishText(selectedText, mode)
+      const result = await aiPolishText(selectedText, mode)
       restoreSavedSelection()
-      editor.chain().focus().deleteSelection().insertContent(result).run()
+      const richContent = markdownToRichContent(result.text)
+      editor.chain().focus().deleteSelection().insertContent(richContent).run()
     } catch (e) {
       toast({ title: "AI 处理失败", description: e instanceof Error ? e.message : "未知错误", variant: "destructive" })
     } finally {
