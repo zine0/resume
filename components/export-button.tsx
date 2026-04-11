@@ -1,4 +1,3 @@
-"use client";
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -280,32 +279,22 @@ export function ExportButton({
     }
   }
 
-  const exportAsPDF = () => {
-    const filename = generatePdfFilename(resumeData.title || "");
-    const childWindow = window.open(`/pdf/preview/${filename}`, '_blank');
-    if (!childWindow) {
-      console.error('Failed to open popup window');
+  const exportAsPDF = async () => {
+    setIsExporting(true);
+    try {
+      window.print();
+      toast({ title: "导出成功", description: "请在打印对话框中选择「另存为 PDF」" });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : JSON.stringify(e || {});
+      console.error("导出 PDF 失败:", msg);
       toast({
         title: "导出失败",
-        description: "无法打开 PDF 预览窗口，请检查浏览器弹窗设置",
+        description: `导出 PDF 时发生错误：${msg}`,
         variant: "destructive",
       });
-      return;
+    } finally {
+      setIsExporting(false);
     }
-
-    const handleMessage = (event: MessageEvent) => {
-      if (event.source === childWindow && event.data.type === 'ready') {
-        childWindow.postMessage({ type: 'resumeData', data: resumeData }, '*');
-        window.removeEventListener('message', handleMessage);
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-
-    // 设置超时，如果子窗口没有准备好
-    setTimeout(() => {
-      window.removeEventListener('message', handleMessage);
-    }, 5000); // 5秒超时
   };
 
   const exportAsJSON = () => {

@@ -1,4 +1,3 @@
-"use client"
 import { createContext, useContext, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import ColorPicker from './color-picker'

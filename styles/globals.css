@@ -121,3 +121,57 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Resume editor layout */
+.resume-editor {
+  @apply flex flex-col h-screen overflow-hidden;
+}
+
+.editor-toolbar {
+  @apply flex items-center justify-between px-6 py-3 border-b bg-background shrink-0 flex-wrap gap-2;
+}
+
+.editor-content {
+  @apply flex flex-1 overflow-hidden;
+}
+
+.editor-panel {
+  @apply overflow-y-auto flex-1 border-r;
+}
+
+.preview-panel {
+  @apply overflow-y-auto flex-1 p-6 bg-muted/30;
+}
+
+.section-card {
+  @apply p-4;
+}
+
+.section-header {
+  @apply flex items-center justify-between mb-4;
+}
+
+.section-title {
+  @apply font-medium text-sm;
+}
+
+/* Print: hide editor chrome, expand preview to full page */
+@media print {
+  .editor-toolbar,
+  .editor-panel {
+    display: none !important;
+  }
+
+  .editor-content {
+    display: block !important;
+    overflow: visible !important;
+  }
+
+  .preview-panel {
+    width: 100% !important;
+    padding: 0 !important;
+    background: white !important;
+    overflow: visible !important;
+    border: none !important;
+  }
+}

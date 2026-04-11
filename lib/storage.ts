@@ -1,4 +1,3 @@
-"use client"
 
 import { importFromMagicyanFile, validateResumeData } from "@/lib/utils"
 import type { ResumeData, StoredResume } from "@/types/resume"

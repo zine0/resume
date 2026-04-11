@@ -1,5 +1,4 @@
 ﻿/* eslint-disable @next/next/no-img-element */
-"use client"
 
 import { useLayoutEffect, useRef, useState } from "react"
 import { Icon } from "@iconify/react"

@@ -1,4 +1,3 @@
-"use client"
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/react'

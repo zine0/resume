@@ -3,15 +3,14 @@
 # dependencies
 /node_modules
 
-# next.js
-/.next/
-/out/
+# vite
+/dist/
+
+# tauri
+/src-tauri/target/
 
 # history
 /.history
-
-# production
-/build
 
 # debug
 npm-debug.log*
@@ -22,11 +21,9 @@ yarn-error.log*
 # env files
 .env*
 
-# vercel
-.vercel
-
 # typescript
 *.tsbuildinfo
-next-env.d.ts
+
+# editor
 .vscode/
 .kiro/

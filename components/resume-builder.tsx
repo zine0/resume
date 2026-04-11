@@ -1,8 +1,7 @@
-"use client"
 
 import type React from "react"
 
-import { useState, useEffect, useCallback, memo } from "react"
+import { useState, useEffect, useCallback, memo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,6 +16,7 @@ import PersonalInfoEditor from "./personal-info-editor"
 import JobIntentionEditor from "./job-intention-editor"
 import ModuleEditor from "./module-editor"
 import ExportButton from "./export-button"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 type ViewMode = "both" | "edit-only" | "preview-only"
 
@@ -70,7 +70,15 @@ export default function ResumeBuilder({ initialData, template = "default", onCha
     showPreview: true,
   })
 
+  const isMobile = useIsMobile()
+  const userOverridden = useRef(false)
+
   const [viewMode, setViewMode] = useState<ViewMode>("both")
+
+  useEffect(() => {
+    if (userOverridden.current) return
+    setViewMode(isMobile ? "edit-only" : "both")
+  }, [isMobile])
 
   useEffect(() => {
     if (initialData) return
@@ -85,8 +93,8 @@ export default function ResumeBuilder({ initialData, template = "default", onCha
     loadTemplate()
   }, [initialData, template])
 
-  // initialData 仅用于初始值；避免在 effect 中同步 setState 触发级联渲染
   const handleViewModeChange = useCallback((mode: ViewMode) => {
+    userOverridden.current = true
     setViewMode(mode)
   }, [])
 
@@ -109,7 +117,7 @@ export default function ResumeBuilder({ initialData, template = "default", onCha
   return (
     <div className="resume-editor">
       {/* 工具栏 */}
-      <div className="editor-toolbar">
+      <div className="editor-toolbar no-print">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <Icon icon="mdi:file-document-edit" className="w-6 h-6 text-primary" />
@@ -162,7 +170,7 @@ export default function ResumeBuilder({ initialData, template = "default", onCha
       <div className="editor-content">
         {/* 编辑面板 */}
         {(viewMode === "both" || viewMode === "edit-only") && (
-          <div className={`editor-panel ${viewMode === "edit-only" ? "w-full" : ""}`}>
+          <div className={`editor-panel no-print ${viewMode === "edit-only" ? "w-full" : ""}`}>
             <div className="p-6 space-y-6">
               {/* 简历标题编辑 */}
               <Card className="p-4">

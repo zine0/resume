@@ -1,7 +1,6 @@
-"use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useNavigate } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -21,7 +20,7 @@ type SortKey = "name" | "createdAt" | "updatedAt"
 type SortDir = "asc" | "desc"
 
 export default function UserCenter() {
-  const router = useRouter()
+  const navigate = useNavigate()
   const { toast } = useToast()
 
   const [items, setItems] = useState<StoredResume[]>([])
@@ -117,7 +116,7 @@ export default function UserCenter() {
         try { sessionStorage.setItem("new-edit-initial-data", JSON.stringify(data)) } catch { }
       }
     } finally {
-      router.push(`/edit/new`)
+      navigate(`/edit/new`)
     }
   }
 
@@ -127,7 +126,7 @@ export default function UserCenter() {
 
   const handleClone = (id: string) => {
     // 不立即保存，带上 cloneId 进入新建编辑页
-    router.push(`/edit/new?clone=${encodeURIComponent(id)}`)
+    navigate(`/edit/new?clone=${encodeURIComponent(id)}`)
   }
 
   const handleImport: React.ChangeEventHandler<HTMLInputElement> = async (event) => {
@@ -321,14 +320,14 @@ export default function UserCenter() {
                   <TableCell className="text-xs text-center">{new Date(it.updatedAt).toLocaleString()}</TableCell>
                   <TableCell className="text-right w-[360px]">
                     <div className="flex items-center gap-2 justify-end">
-                      <Button variant="ghost" className="gap-2" onClick={() => router.push(`/view/${it.id}`)}>
+                      <Button variant="ghost" className="gap-2" onClick={() => navigate(`/view/${it.id}`)}>
                         <Icon icon="mdi:eye" className="w-4 h-4" /> 查看
                       </Button>
                       <ExportButton
                         resumeData={it.resumeData}
                         variant="ghost"
                       />
-                      <Button variant="ghost" className="gap-2" onClick={() => router.push(`/edit/${it.id}`)}>
+                      <Button variant="ghost" className="gap-2" onClick={() => navigate(`/edit/${it.id}`)}>
                         <Icon icon="mdi:pencil" className="w-4 h-4" /> 编辑
                       </Button>
                       <Button variant="ghost" className="gap-2" onClick={() => handleClone(it.id)}>
