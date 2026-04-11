@@ -1,241 +1,203 @@
 ﻿# 简历生成器
+
 > ⭐⭐⭐ **如果这个项目对您有帮助，请给个小星星！** 您的支持是我持续改进和添加新功能的动力。
 
-一个灵活且功能强大的简历构建和导出工具，帮助用户快速创建、编辑和导出干净、简洁而又专业的简历，支持所见即所得。数据存储在浏览器，本地保存与管理简历更放心。
+一个基于 **Tauri v2 + Vite + React** 的桌面简历编辑器。你可以在本地创建、编辑、预览、导出和管理多份简历，支持 PDF、PNG、JPG、WEBP、SVG、JSON 等多种导出格式，并集成了可配置的 AI 简历优化能力。
 
 ## 功能特点
 
-- **用户中心**: 首页集中管理你的简历，支持检索、排序、批量选择与删除、导入/导出
-- **本地存储**: 多份简历持久化到浏览器 `localStorage`，随开随用（支持 JSON 备份还原）
-- **简历编辑**: 直观的界面，轻松编辑个人信息和简历内容
-- **模块化设计**: 支持添加、删除和重排简历模块
-- **实时预览**: 即时查看简历编辑效果
-- **PDF 导出**: 优先由服务端 Chromium 渲染同一份 HTML/CSS 生成干净 PDF；不可用时自动降级浏览器打印，并给出引导
-- **图片导出**: 支持导出为 PNG、JPG、WEBP、SVG 等图片格式
-- **富文本支持**: 支持自由设置文本格式，如字体、文字大小、颜色、对齐方式以及是否加粗、URL 链接等
-- **自适应**: 支持不同模块/布局自由组合，自动调整元素尺寸
-
-<p align="left">
-  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fwzdnzd%2Fresume&env=SITE_PASSWORD&project-name=resume&repository-name=resume" target="_blank" rel="noopener noreferrer"><img src="https://vercel.com/button" alt="Vercel" height="30"></a>
-  &nbsp;
-  <a href="https://edgeone.ai/pages/new?repository-url=https%3A%2F%2Fgithub.com%2Fwzdnzd%2Fresume&env=SITE_PASSWORD&project-name=resume&repository-name=resume" target="_blank" rel="noopener noreferrer"><img src="https://cdnstatic.tencentcs.com/edgeone/pages/deploy.svg" alt="EdgeOne Pages" height="30"></a>
-</p>
+- **多份简历管理**：首页集中管理你的简历，支持搜索、排序、批量删除、导入和导出
+- **桌面本地存储**：简历数据保存在 Tauri 应用数据目录中，而不是浏览器 `localStorage`
+- **模块化编辑**：支持添加、删除、重排简历模块，适配教育、工作、项目等内容
+- **实时预览**：编辑与预览联动，所见即所得
+- **桌面 PDF 导出**：由 Rust + `headless_chrome` 生成 PDF，并支持保存到用户指定位置
+- **图片导出**：支持 PNG、JPG、WEBP、SVG 导出
+- **JSON 导入导出**：便于备份、迁移和模板复用
+- **AI 能力**：支持 AI 配置、岗位 JD 分析、简历润色与整份简历优化
+- **富文本支持**：支持文本样式、颜色、对齐、链接、标签等丰富编辑能力
 
 ## 页面示例截图
-1. 用户中心：本地化集中管理多份简历
+
+1. 用户中心：本地集中管理多份简历  
 ![用户中心](./docs/user-center.png)
 
-1. 编辑和预览：随时查看渲染效果
+2. 编辑和预览：边编辑边查看渲染效果  
 ![编辑和预览界面](./docs/edit-preview.png)
 
-1. 仅编辑：专注于编写
+3. 仅编辑：专注于内容编写  
 ![仅编辑](./docs/edit-only.png)
 
-1. 仅预览：简历效果一览无余
+4. 仅预览：查看最终展示效果  
 ![仅预览](./docs/preview-only.png)
 
-1. 自由布局：左对齐/居中对齐、列数调整等多个选项随心控制
+5. 自由布局：支持多种布局和模块组合  
 ![自由布局](./docs/multi-line.png)
 
-1. 多种导出方式：不同成品满足不同需求
+6. 多种导出方式：不同成品满足不同投递需求  
 ![导出方式](./docs/export.png)
 
-1. 标签功能：为企业或项目等添加标签，让HR/面试官快速理解你
+7. 标签功能：快速表达项目、技能或亮点  
 ![标签添加](./docs/tags.png)
 
 ## 技术栈
 
-- **前端框架**: Next.js
-- **UI组件**: Shadcn UI
-- **样式**: Tailwind CSS
-- **PDF生成**: puppeteer-core + @sparticuz/chromium（Serverless 友好）
-- **图标**: Iconify
+- **桌面框架**：Tauri v2
+- **前端构建**：Vite 6
+- **前端框架**：React 19 + React Router 7
+- **语言**：TypeScript + Rust
+- **UI 组件**：Shadcn UI
+- **样式**：Tailwind CSS v4
+- **富文本**：Tiptap 3
+- **拖拽**：@hello-pangea/dnd
+- **PDF 生成**：Rust + `headless_chrome`
+- **图标**：Iconify
 
 ## 快速开始
 
 ### 安装依赖
 
 ```bash
-# 使用pnpm安装依赖
 pnpm install
 ```
 
-### 开发环境运行
+### 前端开发模式
 
 ```bash
 pnpm dev
 ```
 
-应用将在 [http://localhost:3000](http://localhost:3000) 启动。本地已默认集成 `puppeteer-core` 与 `@sparticuz/chromium`，服务端 PDF 可直接使用；当不可用时会自动降级为浏览器打印。
+默认启动 Vite 开发服务器，地址为 `http://localhost:5173`。
 
-### 构建生产版本
+### Tauri 桌面开发模式
+
+```bash
+pnpm tauri:dev
+```
+
+该命令会先启动前端开发服务器，再拉起 Tauri 桌面窗口。
+
+### 构建前端产物
 
 ```bash
 pnpm build
 ```
 
+### 构建桌面应用
+
+```bash
+pnpm tauri:build
+```
+
 ## 项目结构
-```
+
+```text
 /
-├── app/
-│  ├── globals.css
-│  ├── layout.tsx
-│  ├── page.tsx                         # 首页：用户中心（本地简历管理）
-│  ├── edit/
-│  │  ├── new/page.tsx                  # 新建简历（可选携带 ?clone=ID 预填）
-│  │  └── [id]/page.tsx                 # 编辑本地已保存的简历
-│  ├── view/[id]/page.tsx               # 仅预览本地已保存的简历
-│  ├── pdf/preview/[filename]/page.tsx  # 在线 PDF 预览页（服务端优先，自动降级打印）
-│  ├── print/page.tsx                   # 打印专用页面（供 Chromium 渲染）
-│  ├── auth/page.tsx                    # 访问口令输入页（可选）
-│  └── api/
-│     ├── auth/route.ts                 # 认证接口（设置 Cookie）
-│     ├── image-proxy/route.ts          # 远程图片代理（用于导出防跨域）
-│     └── pdf/
-│        ├── health/route.ts            # 健康检查（尝试启动 headless 浏览器）
-│        ├── [filename]/route.ts        # 生成并缓存 PDF（POST→303→GET 下载/预览）
-│        └── route.ts                   # 直接生成并返回 PDF（Puppeteer + Chromium）
-├── components/
-│  ├── user-center.tsx                  # 用户中心（首页）
-│  ├── export-button.tsx                # 一键导出（PDF/图片/JSON）
-│  ├── resume-builder.tsx               # 简历编辑主界面
-│  ├── resume-preview.tsx               # HTML 预览（PDF 与预览同源 HTML/CSS）
-│  ├── print-content.tsx                # 打印内容容器
-│  ├── pdf-viewer.tsx                   # 自动选择：服务端 PDF 或浏览器打印
-│  └── ui/…                             # Shadcn UI 基础组件集合
-├── hooks/
-│  ├── use-mobile.ts
-│  └── use-toast.ts
-├── lib/
-│  ├── utils.ts                         # 通用工具（默认模板、导出工具等）
-│  └── storage.ts                       # 本地存储封装（localStorage）
-├── styles/
-│  ├── globals.css
-│  ├── print.css                        # 打印样式
-│  └── tiptap.css                       # 富文本编辑器样式
-├── public/
-│  ├── NotoSansSC-Medium.ttf            # 字体（预览/打印共用）
-│  ├── template.json                    # 示例简历数据
-│  └── …
-└── types/
-   └── resume.ts
+├── components/                 # React 组件（编辑器、预览、导出、AI 功能、UI 组件等）
+├── hooks/                      # React hooks
+├── lib/                        # 前端工具与 Tauri 调用封装
+├── public/                     # 静态资源、模板 JSON、字体等
+├── src/
+│   ├── App.tsx                 # 路由与 Provider 入口
+│   ├── main.tsx                # Vite React 启动入口
+│   └── routes/                 # 页面路由：Home / Edit / View / Print
+├── src-tauri/
+│   ├── capabilities/           # Tauri 能力权限声明
+│   ├── src/
+│   │   ├── ai_config.rs        # AI 配置读写
+│   │   ├── lib.rs              # Tauri 插件和命令注册入口
+│   │   ├── pdf.rs              # PDF 生成
+│   │   ├── resume.rs           # 简历数据校验与辅助构造
+│   │   └── storage.rs          # 简历本地存储
+│   ├── tauri.conf.json         # Tauri 配置
+│   └── Cargo.toml              # Rust 依赖
+├── styles/                     # 全局样式、打印样式、Tiptap 样式
+├── types/                      # TypeScript 类型定义
+├── AGENTS.md                   # 项目代理开发说明
+└── README.md
 ```
 
-## 简历数据
-```typescript
-export interface ResumeFile {
-  version: string;
-  data: ResumeData;
-  metadata: {
-    exportedAt: string;
-    appVersion: string;
-  };
-}
+## 路由说明
 
-export interface ResumeData {
-  title: string;                     // 简历标题/姓名
-  centerTitle?: boolean;             // 标题是否居中
-  personalInfoSection: PersonalInfoSection; // 个人信息模块（支持 inline/grid）
-  jobIntentionSection?: JobIntentionSection; // 求职意向模块（可选）
-  modules: ResumeModule[];           // 其它模块（教育/经历/项目等）
-  avatar?: string;                   // 头像 URL（可为 data:URL）
-  createdAt: string;
-  updatedAt: string;
-}
+当前桌面应用使用 React Router：
+
+- `/`：简历列表 / 用户中心
+- `/edit/new`：创建新简历
+- `/edit/:id`：编辑已有简历
+- `/view/:id`：只读预览
+- `/print`：打印渲染页面
+
+## 数据与存储
+
+- 前端通过 `lib/storage.ts` 调用 `@tauri-apps/api/core` 的 `invoke(...)`
+- Rust 侧在 `src-tauri/src/storage.rs` 中处理简历读写
+- 简历数据存储在 Tauri 应用数据目录中的 `resumes.json`
+- 项目保留了旧格式数据兼容/迁移逻辑
+
+这意味着当前版本的“本地存储”是 **桌面本地文件存储**，而不是浏览器 `localStorage`。
+
+## PDF / 图片 / JSON 导出
+
+### PDF 导出
+
+- 前端生成用于打印的 HTML 内容
+- Rust 命令 `generate_pdf` 调用 `headless_chrome` 渲染 HTML
+- 生成后的 PDF 会先写入应用数据目录，再由前端复制到用户选择的位置
+- 保存流程依赖 Tauri 的 `dialog` 和 `fs` 能力
+
+### 图片导出
+
+- 使用 `html-to-image` 生成 PNG / JPG / WEBP / SVG
+- 导出前会准备离屏预览节点，避免依赖页面当前布局状态
+
+### JSON 导入导出
+
+- 可将简历内容导出为 JSON 进行备份
+- 可重新导入 JSON 恢复或迁移简历内容
+
+## AI 功能
+
+当前仓库已经包含桌面端 AI 能力相关模块，主要包括：
+
+- AI 服务配置
+- JD 分析
+- 简历润色
+- 整份简历优化
+
+相关代码可重点查看：
+
+- `components/ai-settings-dialog.tsx`
+- `components/jd-analysis-sheet.tsx`
+- `components/full-resume-optimization-dialog.tsx`
+- `lib/ai-config.ts`
+- `lib/ai-service.ts`
+- `types/ai.ts`
+- `src-tauri/src/ai_config.rs`
+
+## 关键开发命令
+
+```bash
+pnpm install
+pnpm dev
+pnpm build
+pnpm tauri:dev
+pnpm tauri:build
 ```
 
-## 功能说明
-> 基于 [resume-builder](https://github.com/magicyan418/resume-builder) 二次开发，感谢原作者的开源。
+## 开发注意事项
 
-### 用户中心与本地存储
+- 请始终使用 `pnpm`
+- 这是 **Vite + React Router** 项目，不要重新引入 Next.js 目录结构或约定
+- 不要添加 Next.js 专属的 `"use client"` 指令
+- 需要修改数据持久化时，应优先更新 `lib/storage.ts` 与 Rust 后端命令，而不是直接在 UI 里处理底层存储
+- 修改桌面文件操作逻辑时，要同步检查 `src-tauri/capabilities/default.json`
+- PDF 功能依赖 `headless_chrome`，不同机器上的 Chrome/Chromium 可用性可能影响运行表现
 
-- 首页即用户中心：集中管理本地保存的简历条目
-- 数据存储在浏览器 `localStorage`，纯本地化更放心
-- 操作：新建、编辑、预览、复制（从现有条目预填）、导入与导出、批量选择与删除等
-- 支持按标题搜索、按名称/创建时间/更新时间排序
-- 空间不足时会提示先导出 JSON 做备份再清理
+## 后续可继续完善的方向
 
-### 个人信息编辑
-
-支持添加、编辑和删除个人信息项，如姓名、电话、邮箱等。每个信息项可以设置标签、值和图标。
-
-### 求职意向
-
-支持添加、编辑和删除个人求职意向、期望薪资、目标城市等信息。
-
-### 简历模块
-
-支持多种类型的简历模块，如教育背景、工作经历、项目经验等。每个模块可以包含标题、图标、和详细内容。
-
-### PDF 导出（服务端优先，自动降级）
-
-- 服务端优先：`POST /api/pdf` 使用 `puppeteer-core + @sparticuz/chromium` 打开`/print`，通过`sessionStorage`传入数据，设置`displayHeaderFooter:false`、`printBackground:true`、`preferCSSPageSize:true`，返回干净的`application/pdf`（inline）。
-- 降级体验：若服务端不可用或失败，自动使用浏览器打印（所见即所得），界面会提示：
-  - 关闭“页眉和页脚”
-  - 勾选“背景图形”
-
-环境变量（可选）
-- `NEXT_PUBLIC_FORCE_SERVER_PDF=true` 强制使用服务端 PDF
-- `NEXT_PUBLIC_FORCE_PRINT=true` 强制使用浏览器打印
-- `PUPPETEER_EXECUTABLE_PATH=/path/to/chrome` 或 `CHROME_PATH=/path/to/chrome` 指定系统 Chrome 可执行文件（在某些平台上更稳定）
-
-接口说明
-- `GET /api/pdf/health`：健康检查，验证 headless 启动能力
-- `POST /api/pdf`：传入`{ resumeData }`，直接返回`application/pdf`
-- `POST /api/pdf/:filename`：传入`{ resumeData }`，生成后返回`303`到`GET /api/pdf/:filename?token=...`（便于内联预览/下载）
-- `GET /api/pdf/:filename?token=...`：短期缓存（约 5 分钟）内联返回 PDF
-- `GET /api/image-proxy?url=...`：图片代理，导出图片时用于规避跨域与画布污染
-### 部署到 Vercel
-
-- 仅支持 Node.js Runtime 的 Serverless Functions（不是 Edge）。
-- 我们在 `route.ts` 中声明了 `export const runtime = 'nodejs'` 与 `dynamic = 'force-dynamic'`。
-- 依赖：`puppeteer-core`、`@sparticuz/chromium`（Serverless 友好）。无需打包二进制。
-- 建议在项目设置提升函数超时与内存（如 1024MB/1536MB）。
-
-### 数据导入导出
-
-- 在“用户中心”可导入 `.json` 文件；导出支持 JSON、PDF、PNG/JPG/WEBP/SVG 多种格式
-- 编辑页右上角亦内置导出菜单；导出 PDF 默认走服务端，可降级浏览器打印
-
-## 自定义主题
-
-项目使用 Tailwind CSS 进行样式管理，可按需扩展样式与主题（见样式与组件代码）。
-
-
-## 访问密码保护
-
-如果你希望对页面访问进行简单的密码保护，可设置环境变量 `SITE_PASSWORD`。当该变量存在且不为空时：
-- 用户访问任意页面会先被重定向到 `/auth` 输入密码；
-- 验证通过后，服务端会在浏览器写入一个有效期 30 天的 Cookie，后续访问无需再输入；
-- 若未配置 `SITE_PASSWORD`，则不启用认证，正常访问。
-
-使用方法：
-- 在项目根目录新增或编辑 `.env.local` 文件，加入：
-
-```
-SITE_PASSWORD=你的访问密码
-```
-
-说明：
-- 我们不会在 Cookie 中保存明文密码，而是保存其 SHA-256 摘要；
-- 中间件只对页面路由生效，不拦截 `/_next/*`、`/favicon.ico`、`/robots.txt` 以及认证相关路径 `/auth`、`/api/auth`；
-- 如需关闭认证，删除或清空 `SITE_PASSWORD` 即可。
-
-## TODO
-
-### 集成 AI 服务
-- [ ] 允许用户自定义服务提供商和模型，支持 OpenAI、Anthropic、Gemini等接口类型
-- [ ] 结合 Job Description 自动编写、润色、优化、纠错简历
-- [ ] 基于简历给出面试准备建议
-- [ ] 模拟面试
-- [ ] 利用 AI Agent 从网络自动抓取并汇总相似岗位的面经并展示
-
-### 个性化简历样式
-- [ ] 提供更多简历模板以供选择，可参考 [novoresume](https://novoresume.com/cv-templates)
-
-### 支持加密远程存储
-- [ ] 集成 WebDAV、Google Cloud、OneDrive 等用于数据存储与同步
-- [ ] 用户自定义加密密码
+- 提升 PDF 失败时的错误提示与降级体验
+- 进一步统一主题持久化与其它桌面端状态管理策略
+- 补充 Windows / macOS / Linux 的打包验证
+- 增加更多简历模板与 AI 场景
 
 ## 许可证
 

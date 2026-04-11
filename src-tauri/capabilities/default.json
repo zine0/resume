@@ -19,6 +19,7 @@
     "fs:allow-remove",
     "fs:allow-rename",
     "fs:allow-exists",
+    "fs:allow-copy-file",
     "dialog:default",
     "dialog:allow-save",
     "dialog:allow-open"

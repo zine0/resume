@@ -4,215 +4,212 @@
 
 ## Project Overview
 
-A browser-based resume builder that stores all data in `localStorage`. Users create, edit, preview, and export resumes (PDF/PNG/JPG/WEBP/SVG/JSON). The app is a single-page-style Next.js application with server-side PDF generation via Puppeteer.
+This project is a desktop resume builder built with **Tauri v2 + Vite + React Router**. Users can create, edit, preview, and export resumes as PDF, PNG, JPG, WEBP, SVG, and JSON. The frontend is a React single-page application, while persistence and PDF generation are handled by Rust commands exposed through Tauri.
 
-**Stack**: Next.js 16 (App Router) · React 19 · TypeScript (strict) · Tailwind CSS v4 · Shadcn UI · Tiptap 3 · puppeteer-core + @sparticuz/chromium · @hello-pangea/dnd · Iconify
+**Stack**: Tauri v2 · Vite 6 · React 19 · React Router 7 · TypeScript (strict) · Tailwind CSS v4 · Shadcn UI · Tiptap 3 · Rust · `headless_chrome` · `@hello-pangea/dnd` · Iconify
 
 **Package Manager**: pnpm (always use `pnpm`, never npm or yarn)
 
 ## Architecture
 
-### Rendering Model
+### Runtime Model
 
-- **Pages are Server Components by default** (App Router convention)
-- **All interactive components use `"use client"`** — this is a heavily client-side app
-- Server-side code exists only in: `middleware.ts`, `app/api/` routes, and `app/layout.tsx`
-- PDF generation: Server launches headless Chromium, navigates to `/print`, renders the same HTML/CSS as the preview, returns PDF
+- The frontend is a **Vite React SPA** mounted from `src/main.tsx`
+- Routing is handled by **React Router** in `src/App.tsx`
+- Browser-side business logic lives in React components, hooks, and `lib/`
+- Native capabilities live in `src-tauri/` and are exposed through `invoke(...)`
+- PDF generation is **desktop-native**: frontend builds printable HTML, Rust launches headless Chrome, renders that HTML, and writes a PDF into the app data directory
 
 ### Data Flow
 
-```
-localStorage ←→ lib/storage.ts ←→ Page Components ←→ Editor Components
-                                        ↕
-                                   ResumePreview (shared HTML/CSS)
-                                        ↕
-                              /print page ← Puppeteer ← /api/pdf
+```text
+React UI ←→ lib/storage.ts ←→ Tauri invoke() ←→ Rust commands ←→ app data directory
+      ↘
+       ResumePreview / PrintContent ←→ HTML export / PDF generation
 ```
 
-- **No backend database**. All resume data lives in browser `localStorage` under key `"resume.entries"`
-- `lib/storage.ts` is the sole interface to localStorage — never access `window.localStorage` directly
-- `lib/utils.ts` contains data factories (`createDefaultResumeData`, `createNewModule`, etc.), validation, and export/import logic
-- `types/resume.ts` defines all data structures
+- Resume data is no longer stored in browser `localStorage`
+- `lib/storage.ts` is the sole frontend interface for resume persistence and resume-related backend helpers
+- Rust storage code persists resume entries in the app data directory as `resumes.json`
+- `lib/utils.ts` contains frontend utilities such as formatting helpers, export helpers, factories, and data normalization
+- `types/resume.ts` defines the shared TypeScript data structures used throughout the frontend
 
 ### Routing
 
+Defined in `src/App.tsx`:
+
 | Route | Purpose | Key Component |
-|-------|---------|---------------|
-| `/` | User center — manage all resumes | `user-center.tsx` |
-| `/edit/new` | Create new resume (supports `?clone=ID`, `?example=1`) | `resume-builder.tsx` |
-| `/edit/[id]` | Edit existing resume | `resume-builder.tsx` |
-| `/view/[id]` | Read-only preview | `resume-preview.tsx` |
-| `/print` | Print container for Puppeteer | `print-content.tsx` |
-| `/auth` | Password login (optional) | `auth-form.tsx` |
-| `/api/pdf` | Generate PDF | puppeteer-core |
-| `/api/pdf/[filename]` | Cached PDF download | POST→303→GET pattern |
-| `/api/pdf/health` | Headless browser check | — |
-| `/api/auth` | Password authentication | SHA-256 cookie |
-| `/api/image-proxy` | CORS proxy for exports | Edge runtime |
+|---|---|---|
+| `/` | Resume list / user center | `src/routes/Home.tsx` |
+| `/edit/new` | Create a new resume, optionally from clone/example/prefetched data | `src/routes/EditNew.tsx` |
+| `/edit/:id` | Edit an existing resume | `src/routes/EditResume.tsx` |
+| `/view/:id` | Read-only preview | `src/routes/ViewResume.tsx` |
+| `/print` | Print-friendly rendering surface | `src/routes/Print.tsx` |
 
-### Component Hierarchy
+### Tauri Backend Surface
 
-```
-RootLayout (providers: Theme, ColorPicker, Toolbar)
-└── Page (Server Component)
-    └── Client Component (user-center | resume-builder | resume-preview | auth-form)
-        ├── Editors: personal-info-editor, job-intention-editor, module-editor, rich-text-input
-        ├── Preview: resume-preview → rich-text-renderer
-        ├── Export: export-button (PDF/PNG/JPG/WEBP/SVG/JSON)
-        └── Shared: color-picker*, icon-picker, tag-input, floating-action-bar, pdf-viewer
-```
+Registered in `src-tauri/src/lib.rs`:
+
+- AI config commands: `get_ai_config`, `save_ai_config`
+- Resume helpers: `get_default_resume_data`, `validate_resume_data_command`, `import_resume_file`, `export_resume_file`
+- Resume structure factories: `create_personal_info_item`, `create_job_intention_item`, `create_resume_module`, `create_rich_text_row`, `create_tags_row`
+- Storage commands: `get_all_resumes`, `get_resume_by_id`, `create_resume`, `create_resume_from_data`, `update_resume`, `delete_resumes`
+- Export command: `generate_pdf`
+
+### Storage Model
+
+- Frontend calls `invoke(...)` through `lib/storage.ts`
+- Rust storage implementation lives in `src-tauri/src/storage.rs`
+- Data is written to the Tauri app data directory, currently in `resumes.json`
+- Legacy data parsing/migration is handled in Rust when older storage formats are encountered
+- Storage failures are mapped into typed frontend `StorageError`s
+
+### PDF / Export Model
+
+- Image and JSON exports are initiated from frontend components such as `components/export-button.tsx`
+- Desktop save flows use `@tauri-apps/plugin-dialog` and `@tauri-apps/plugin-fs`
+- PDF generation is implemented in `src-tauri/src/pdf.rs`
+- Rust writes a temporary HTML file, renders it through `headless_chrome`, and stores the generated PDF in the app data directory
+- Frontend save flows may copy generated PDFs into a user-selected destination, so Tauri FS capabilities must stay in sync with `copyFile` usage
 
 ## Conventions
 
 ### TypeScript
 
 - **Strict mode** is enabled — no `as any`, `@ts-ignore`, or `@ts-expect-error`
-- **Interfaces** for data shapes (ResumeData, PersonalInfoItem, etc.)
-- **Types** for unions and utility types (StorageErrorCode, ViewMode, etc.)
-- **Custom error class** `StorageError` in `lib/storage.ts` with typed codes: `UNAVAILABLE`, `PARSE_ERROR`, `QUOTA_EXCEEDED`, `UNKNOWN`
+- Prefer **interfaces** for domain data shapes and **types** for unions/utilities
+- `StorageError` in `lib/storage.ts` is the canonical frontend error type for storage/backend failures
 - Path alias: `@/*` → project root
 
 ### Imports
 
-Always use absolute paths with the `@/` alias:
+Always use the `@/` alias for project-local imports:
 
 ```tsx
 import { Button } from "@/components/ui/button"
 import type { ResumeData } from "@/types/resume"
-import { createDefaultResumeData } from "@/lib/utils"
+import { getAllResumes } from "@/lib/storage"
 import { useToast } from "@/hooks/use-toast"
 ```
 
 ### Components
 
-- **Functional components only**, no class components
-- **`memo()`** used selectively for performance (e.g., ViewModeSelector in resume-builder.tsx)
-- **File naming**: kebab-case (`resume-builder.tsx`)
-- **Component naming**: PascalCase (`ResumeBuilder`)
-- **Shadcn UI components** live in `components/ui/` — use CVA variants, never modify directly, add new ones via `npx shadcn@latest add <component>`
-- **"use client"** directive required for any component with hooks, event handlers, or browser APIs
+- Functional components only
+- File naming: kebab-case
+- Component naming: PascalCase
+- This is a Vite React app, so **do not add Next.js-only directives like `"use client"`**
+- `components/ui/` contains Shadcn UI primitives; avoid hand-editing generated patterns unless necessary
 
 ### Styling
 
-- **Tailwind CSS v4** with PostCSS — uses `@import "tailwindcss"` syntax (not v3 `@tailwind` directives)
-- **CSS custom properties** in `oklch` color space in `styles/globals.css`
-- **`@theme inline`** block maps CSS vars to Tailwind tokens
-- **`@layer components`** for reusable utility classes (`.resume-editor`, `.editor-toolbar`, etc.)
-- **Print styles** in `styles/print.css` and `@media print` blocks
-- **`cn()`** from `@/lib/utils` for conditional class merging (uses `clsx` + `tailwind-merge`)
-- **Dedicated CSS files**: `styles/tiptap.css` for rich editor, `styles/globals.css` for Tailwind base
+- Tailwind CSS v4 with PostCSS
+- Global styles: `styles/globals.css`
+- Print styles: `styles/print.css`
+- Tiptap styles: `styles/tiptap.css`
+- Use `cn()` from `@/lib/utils` for conditional class composition
 
 ### State Management
 
-- **Pure React hooks**: `useState`, `useEffect`, `useCallback`, `useMemo`
-- **No external state library** (no Redux, Zustand, etc.)
-- **Context providers**: `ColorPickerProvider`, `ToolbarProvider`, `ThemeProvider` (next-themes)
-- **Props drilling** for parent→child state flow
-- **localStorage** via `lib/storage.ts` for persistence
+- React hooks and local component state
+- Shared UI state via providers in `src/App.tsx`:
+  - `ThemeProvider`
+  - `ColorPickerProvider`
+  - `ToolbarProvider`
+- No Redux/Zustand or other external state container
 
 ### Error Handling
 
-- **Client-side**: `try/catch` + `toast()` notifications from `@/hooks/use-toast`
-- **Storage errors**: Check `instanceof StorageError` and `e.code` for specific handling
-- **API routes**: Return JSON `{ error: message }` with appropriate HTTP status codes
-- **PDF fallback**: If server PDF fails, automatically falls back to browser `window.print()`
+- Frontend: `try/catch` + toast-based user feedback
+- Backend: Rust commands return `Result<_, String>` and errors are mapped on the frontend
+- Quota / backend availability / unknown errors should be surfaced through `StorageError`
 
 ### Naming Patterns
 
 | Category | Convention | Example |
-|----------|-----------|---------|
+|---|---|---|
 | Components | PascalCase | `ResumeBuilder` |
 | Files | kebab-case | `resume-builder.tsx` |
-| Hooks | camelCase, `use` prefix | `useToast`, `useMobile` |
-| Utilities | camelCase | `createDefaultResumeData`, `downloadFile` |
-| Types/Interfaces | PascalCase | `ResumeData`, `PersonalInfoItem` |
-| CSS classes | kebab-case | `.resume-editor`, `.editor-toolbar` |
-| Env variables | SCREAMING_SNAKE | `SITE_PASSWORD`, `NEXT_PUBLIC_FORCE_SERVER_PDF` |
+| Hooks | camelCase with `use` prefix | `useToast` |
+| Utilities | camelCase | `generatePdfFilename` |
+| Types/Interfaces | PascalCase | `ResumeData`, `StoredResume` |
+| CSS classes | kebab-case | `.resume-preview`, `.editor-toolbar` |
 
 ## Key Files to Read First
 
-When working on this project, familiarize yourself with these files in order:
+When working on this project, start with these files:
 
-1. **`types/resume.ts`** — All data structures. Everything flows from these types.
-2. **`lib/storage.ts`** — How data is loaded/saved. Understand the StorageError class.
-3. **`lib/utils.ts`** — Factory functions, validation, export/import. Large file with many utilities.
-4. **`components/resume-builder.tsx`** — Main editor. Shows state management and component composition patterns.
-5. **`components/resume-preview.tsx`** — Preview rendering. Must stay in sync with print output.
-6. **`styles/globals.css`** — Theme tokens, Tailwind config, component utility classes.
+1. `types/resume.ts` — core resume data model
+2. `lib/storage.ts` — frontend-to-Tauri persistence and helper API
+3. `src-tauri/src/lib.rs` — Tauri plugin setup and command registration
+4. `src-tauri/src/storage.rs` — native storage implementation
+5. `src-tauri/src/resume.rs` — validation and resume helper constructors
+6. `src-tauri/src/pdf.rs` — desktop PDF generation
+7. `components/resume-builder.tsx` — main editing surface
+8. `components/resume-preview.tsx` — canonical preview rendering
+9. `src/App.tsx` — route and provider composition
 
 ## Common Tasks
 
-### Adding a New Editor Field
+### Adding a New Resume Field
 
-1. Add/update the type in `types/resume.ts`
-2. Add factory defaults in `lib/utils.ts` (e.g., `createDefaultResumeData`)
-3. Create or modify the editor component in `components/`
-4. Update `resume-preview.tsx` to render the new field
-5. Verify `print-content.tsx` renders it correctly for PDF output
+1. Update the TypeScript types in `types/resume.ts`
+2. Update validation / normalization in Rust if needed (`src-tauri/src/resume.rs`)
+3. Update any frontend factories or helpers in `lib/utils.ts` or `lib/storage.ts`
+4. Update editor UI in `components/`
+5. Update `components/resume-preview.tsx` and print-related rendering if needed
+6. Verify create/edit/view/export flows still work
 
-### Adding a New Shadcn UI Component
+### Adding a New Tauri Command
 
-```bash
-npx shadcn@latest add <component-name>
-```
+1. Implement the command in the relevant Rust module under `src-tauri/src/`
+2. Register it in `src-tauri/src/lib.rs`
+3. Add a typed frontend wrapper if the command is consumed from React code
+4. If the command depends on plugin capabilities, update `src-tauri/capabilities/default.json`
+5. Verify through `pnpm tauri:build`
 
-Never manually create files in `components/ui/`. Always use the CLI. The project uses the `new-york` style variant.
+### Modifying Export Behavior
 
-### Adding a New API Route
+- Image / SVG / JSON export flows are primarily in `components/export-button.tsx`
+- PDF rendering is triggered through Tauri `generate_pdf`
+- Print-specific UI uses `/print` + `components/print-content.tsx`
+- If save/copy behavior changes, re-check Tauri `dialog` and `fs` permissions
 
-- Place in `app/api/<route-name>/route.ts`
-- Export named functions (`GET`, `POST`, etc.)
-- Add `export const runtime = "nodejs"` for Node.js APIs
-- Add `export const runtime = "edge"` for lightweight edge APIs
-- Return JSON errors: `new Response(JSON.stringify({ error: message }), { status: 500, headers: { "content-type": "application/json" } })`
+### Modifying Persistence
 
-### Modifying PDF Output
+- Frontend persistence calls should go through `lib/storage.ts`
+- Native persistence logic belongs in `src-tauri/src/storage.rs`
+- Do not bypass the storage abstraction from UI code
 
-- The PDF renders the **same HTML/CSS** as the preview — changes to `resume-preview.tsx` affect both
-- Print-specific overrides go in `styles/print.css` or `@media print` blocks in `globals.css`
-- The `/print` page reads resume data from URL parameter or `sessionStorage` (key: `"resumeData"`)
-- Server-side PDF config is in `app/api/pdf/route.ts` (page size, margins, etc.)
+## Environment / Config
 
-### Modifying Theme/Colors
-
-- Edit CSS custom properties in `styles/globals.css` (`:root` and `.dark` selectors)
-- Uses `oklch` color space — maintain oklch format when changing values
-- The `@theme inline` block maps CSS vars to Tailwind utility classes
-
-## Environment Variables
-
-| Variable | Purpose | Required |
-|----------|---------|----------|
-| `SITE_PASSWORD` | Optional password protection for the entire site | No |
-| `NEXT_PUBLIC_FORCE_SERVER_PDF` | Force server-side PDF generation | No |
-| `NEXT_PUBLIC_FORCE_PRINT` | Force browser print instead of server PDF | No |
-| `PUPPETEER_EXECUTABLE_PATH` | Path to Chrome binary (alternative to bundled Chromium) | No |
-| `CHROME_PATH` | Same as above, alternative env var name | No |
-
-## Build & Dev Commands
+### Frontend and Tauri Commands
 
 ```bash
-pnpm install          # Install dependencies
-pnpm dev              # Start dev server (http://localhost:3000)
-pnpm build            # Production build (ignores ESLint/TS errors per next.config.mjs)
-pnpm start            # Start production server
-pnpm lint             # Run ESLint
+pnpm install
+pnpm dev
+pnpm build
+pnpm tauri:dev
+pnpm tauri:build
 ```
 
-**Note**: `next.config.mjs` has `ignoreDuringBuilds: true` for both ESLint and TypeScript. Pre-existing type errors exist. Do not introduce new ones.
+### Key Config Files
+
+- `package.json` — frontend and Tauri scripts
+- `vite.config.ts` — Vite config and aliasing
+- `src-tauri/tauri.conf.json` — Tauri app identifier, window config, build hooks
+- `src-tauri/capabilities/default.json` — Tauri runtime permissions
 
 ## Gotchas
 
-- **localStorage quota**: `lib/storage.ts` handles quota exceeded errors gracefully. When adding large data fields, test with multiple resumes saved.
-- **PDF/Preview parity**: The HTML rendered in `resume-preview.tsx` must match what Puppeteer sees at `/print`. Any CSS difference will cause PDF output to diverge from preview.
-- **Image handling**: Avatar URLs can be data URLs or remote URLs. Remote images are proxied through `/api/image-proxy` for export to avoid canvas tainting.
-- **Rich text**: Tiptap stores content as `JSONContent` (ProseMirror doc format). Never try to parse it as plain HTML.
-- **Drag and drop**: Uses `@hello-pangea/dnd` (not `react-beautiful-dnd`). The API is similar but the import is different.
-- **Tailwind v4 syntax**: This project uses Tailwind v4, not v3. Configuration is via CSS (`@theme inline`), not `tailwind.config.js`. Do not create a `tailwind.config.js` file.
-- **No tests**: The project has no testing framework. If adding tests, use Vitest (consistent with the ecosystem).
+- `lib/storage.ts` no longer represents browser `localStorage`; it is a Tauri backend adapter
+- `ThemeProvider` still uses a browser storage key (`resume-theme`) for theme persistence, which is separate from resume data persistence
+- Desktop export flows rely on Tauri FS/dialog permissions; missing capabilities can break otherwise-correct UI code
+- PDF generation depends on `headless_chrome`; machine-specific Chrome availability can affect desktop PDF behavior
+- The `/print` route is still part of the SPA and is used as a print/render target, not as a server route
+- Do not reintroduce Next.js concepts like `app/`, server components, API route handlers, `middleware.ts`, or `"use client"`
 
-## Deployment
+## Deployment / Packaging
 
-- **Vercel**: Node.js serverless functions only (not Edge). Set function timeout to 120s, memory to 1024MB+.
-- **EdgeOne Pages**: Also supported per README.
-- The `app/api/pdf/route.ts` exports `maxDuration = 120` for Vercel serverless.
+- This is a **desktop app**, not a Vercel/App Router deployment target
+- Desktop packaging is handled through Tauri via `pnpm tauri:build`
+- Cross-platform packaging and runtime validation should be checked on target OSes when changing native behavior
