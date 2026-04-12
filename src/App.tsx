@@ -12,6 +12,7 @@ import Print from "./routes/Print"
 export default function App() {
   return (
     <BrowserRouter>
+      <ErrorBoundary>
       <ThemeProvider defaultTheme="system" storageKey="resume-theme">
         <ColorPickerProvider>
           <ToolbarProvider>
@@ -26,6 +27,8 @@ export default function App() {
           </ToolbarProvider>
         </ColorPickerProvider>
       </ThemeProvider>
+      </ErrorBoundary>
     </BrowserRouter>
   )
 }
+import { ErrorBoundary } from "@/components/error-boundary"
