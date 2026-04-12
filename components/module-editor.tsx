@@ -1,8 +1,14 @@
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,16 +18,22 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Icon } from "@iconify/react"
-import type { ResumeModule, ModuleContentRow, ModuleContentElement } from "@/types/resume"
-import { createResumeModule, createRichTextRow, createTagsRow } from "@/lib/storage"
-import { useToast } from "@/hooks/use-toast"
-import IconPicker from "./icon-picker"
-import FloatingActionBar from "./floating-action-bar"
-import RichTextInput from "./rich-text-input"
-import TagInput from "./tag-input"
-import { DragDropContext, Droppable, Draggable, DropResult, DraggableProvidedDragHandleProps } from "@hello-pangea/dnd"
+} from '@/components/ui/alert-dialog'
+import { Icon } from '@iconify/react'
+import type { ResumeModule, ModuleContentRow, ModuleContentElement } from '@/types/resume'
+import { createResumeModule, createRichTextRow, createTagsRow } from '@/lib/storage'
+import { useToast } from '@/hooks/use-toast'
+import IconPicker from './icon-picker'
+import FloatingActionBar from './floating-action-bar'
+import RichTextInput from './rich-text-input'
+import TagInput from './tag-input'
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+  DraggableProvidedDragHandleProps,
+} from '@hello-pangea/dnd'
 
 interface ModuleEditorProps {
   modules: ResumeModule[]
@@ -47,9 +59,9 @@ export default function ModuleEditor({ modules, onUpdate }: ModuleEditorProps) {
       setExpandedModules((prev) => new Set([...prev, newModule.id]))
     } catch (e) {
       toast({
-        title: "添加失败",
-        description: e instanceof Error ? e.message : "无法创建新的简历模块",
-        variant: "destructive",
+        title: '添加失败',
+        description: e instanceof Error ? e.message : '无法创建新的简历模块',
+        variant: 'destructive',
       })
     } finally {
       setIsAddingModule(false)
@@ -61,7 +73,7 @@ export default function ModuleEditor({ modules, onUpdate }: ModuleEditorProps) {
    */
   const updateModule = (id: string, updates: Partial<ResumeModule>) => {
     const updatedModules = modules.map((module) =>
-      module.id === id ? { ...module, ...updates } : module
+      module.id === id ? { ...module, ...updates } : module,
     )
     onUpdate(updatedModules)
   }
@@ -121,11 +133,17 @@ export default function ModuleEditor({ modules, onUpdate }: ModuleEditorProps) {
     <Card className="section-card">
       <div className="section-header">
         <div className="flex items-center gap-2">
-          <Icon icon="mdi:view-module" className="w-5 h-5 text-primary" />
+          <Icon icon="mdi:view-module" className="text-primary h-5 w-5" />
           <h2 className="section-title">简历模块</h2>
         </div>
-        <Button size="sm" variant="outline" onClick={addModule} disabled={isAddingModule} className="gap-2 bg-transparent">
-          <Icon icon="mdi:plus" className="w-4 h-4" />
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={addModule}
+          disabled={isAddingModule}
+          className="gap-2 bg-transparent"
+        >
+          <Icon icon="mdi:plus" className="h-4 w-4" />
           添加模块
         </Button>
       </div>
@@ -162,8 +180,11 @@ export default function ModuleEditor({ modules, onUpdate }: ModuleEditorProps) {
               {provided.placeholder}
 
               {modules.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Icon icon="mdi:view-module-outline" className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <div className="text-muted-foreground py-8 text-center">
+                  <Icon
+                    icon="mdi:view-module-outline"
+                    className="mx-auto mb-2 h-8 w-8 opacity-50"
+                  />
                   <p className="text-sm">暂无简历模块，点击"添加模块"开始编辑</p>
                 </div>
               )}
@@ -217,9 +238,9 @@ function ModuleItem({
       onUpdate({ rows })
     } catch (e) {
       toast({
-        title: "添加失败",
-        description: e instanceof Error ? e.message : "无法创建新的内容行",
-        variant: "destructive",
+        title: '添加失败',
+        description: e instanceof Error ? e.message : '无法创建新的内容行',
+        variant: 'destructive',
       })
     } finally {
       setIsAddingRow(false)
@@ -238,13 +259,15 @@ function ModuleItem({
       setIsAddingRow(true)
       const newRow = await createTagsRow(insertIndex)
       rows.splice(insertIndex, 0, newRow)
-      rows.forEach((r, i) => { r.order = i })
+      rows.forEach((r, i) => {
+        r.order = i
+      })
       onUpdate({ rows })
     } catch (e) {
       toast({
-        title: "添加失败",
-        description: e instanceof Error ? e.message : "无法创建新的标签行",
-        variant: "destructive",
+        title: '添加失败',
+        description: e instanceof Error ? e.message : '无法创建新的标签行',
+        variant: 'destructive',
       })
     } finally {
       setIsAddingRow(false)
@@ -255,9 +278,7 @@ function ModuleItem({
    * 更新行
    */
   const updateRow = (rowId: string, updates: Partial<ModuleContentRow>) => {
-    const updatedRows = module.rows.map((row) =>
-      row.id === rowId ? { ...row, ...updates } : row
-    )
+    const updatedRows = module.rows.map((row) => (row.id === rowId ? { ...row, ...updates } : row))
     onUpdate({ rows: updatedRows })
   }
 
@@ -277,11 +298,15 @@ function ModuleItem({
   /**
    * 更新元素
    */
-  const updateElement = (rowId: string, elementId: string, updates: Partial<ModuleContentElement>) => {
+  const updateElement = (
+    rowId: string,
+    elementId: string,
+    updates: Partial<ModuleContentElement>,
+  ) => {
     const updatedRows = module.rows.map((row) => {
       if (row.id === rowId) {
         const updatedElements = row.elements.map((el) =>
-          el.id === elementId ? { ...el, ...updates } : el
+          el.id === elementId ? { ...el, ...updates } : el,
         )
         return { ...row, elements: updatedElements }
       }
@@ -294,22 +319,27 @@ function ModuleItem({
 
   return (
     <>
-      <div className="border rounded-lg bg-muted/30">
+      <div className="bg-muted/30 rounded-lg border">
         {/* 模块头部 */}
         <div
-          className="relative p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+          className="hover:bg-muted/50 relative cursor-pointer p-3 transition-colors"
           onClick={onToggle}
         >
           <div className="flex items-center gap-3">
             {module.icon ? (
-              <svg width={16} height={16} viewBox="0 0 24 24" dangerouslySetInnerHTML={{ __html: module.icon }} />
+              <svg
+                width={16}
+                height={16}
+                viewBox="0 0 24 24"
+                dangerouslySetInnerHTML={{ __html: module.icon }}
+              />
             ) : (
-              <div className="w-4 h-4 border border-dashed border-gray-400 rounded-sm" />
+              <div className="h-4 w-4 rounded-sm border border-dashed border-gray-400" />
             )}
-            <span className="font-medium">{module.title || "未命名模块"}</span>
+            <span className="font-medium">{module.title || '未命名模块'}</span>
             <Icon
-              icon={isExpanded ? "mdi:chevron-up" : "mdi:chevron-down"}
-              className="w-4 h-4 text-muted-foreground ml-auto"
+              icon={isExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+              className="text-muted-foreground ml-auto h-4 w-4"
             />
             <Button
               size="sm"
@@ -318,22 +348,25 @@ function ModuleItem({
                 e.stopPropagation()
                 setShowDeleteConfirm(true)
               }}
-              className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+              aria-label="删除"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
             >
-              <Icon icon="mdi:delete" className="w-4 h-4" />
+              <Icon icon="mdi:delete" className="h-4 w-4" />
             </Button>
             <div {...dragHandleProps} onClick={(e) => e.stopPropagation()}>
-              <Icon
-                icon="mdi:drag"
-                className="w-4 h-4 text-muted-foreground cursor-grab active:cursor-grabbing"
-              />
+              <span role="button" aria-label="拖拽排序" className="contents">
+                <Icon
+                  icon="mdi:drag"
+                  className="text-muted-foreground h-4 w-4 cursor-grab active:cursor-grabbing"
+                />
+              </span>
             </div>
           </div>
         </div>
 
         {/* 模块内容 */}
         {isExpanded && (
-          <div className="p-3 pt-0 space-y-4 border-t">
+          <div className="space-y-4 border-t p-3 pt-0">
             {/* 模块设置 */}
             <div className="grid grid-cols-2 gap-3">
               <div className="form-group">
@@ -348,9 +381,14 @@ function ModuleItem({
                   <DialogTrigger asChild>
                     <Button variant="outline" className="w-full justify-start gap-2 bg-transparent">
                       {module.icon ? (
-                        <svg width={16} height={16} viewBox="0 0 24 24" dangerouslySetInnerHTML={{ __html: module.icon }} />
+                        <svg
+                          width={16}
+                          height={16}
+                          viewBox="0 0 24 24"
+                          dangerouslySetInnerHTML={{ __html: module.icon }}
+                        />
                       ) : (
-                        <div className="w-4 h-4 border border-dashed border-gray-400 rounded-sm" />
+                        <div className="h-4 w-4 rounded-sm border border-dashed border-gray-400" />
                       )}
                       选择图标
                     </Button>
@@ -359,7 +397,10 @@ function ModuleItem({
                     <DialogHeader>
                       <DialogTitle>选择图标</DialogTitle>
                     </DialogHeader>
-                    <IconPicker selectedIcon={module.icon} onSelect={(icon) => onUpdate({ icon })} />
+                    <IconPicker
+                      selectedIcon={module.icon}
+                      onSelect={(icon) => onUpdate({ icon })}
+                    />
                   </DialogContent>
                 </Dialog>
               </div>
@@ -378,7 +419,9 @@ function ModuleItem({
                       row={row}
                       onUpdate={(updates) => updateRow(row.id, updates)}
                       onRemove={() => removeRow(row.id)}
-                      onUpdateElement={(elementId, updates) => updateElement(row.id, elementId, updates)}
+                      onUpdateElement={(elementId, updates) =>
+                        updateElement(row.id, elementId, updates)
+                      }
                       onAddRow={addRow}
                       onAddTagsRow={() => addTagsRow(row.id)}
                     />
@@ -447,18 +490,25 @@ function EmptyRowPlaceholder({ onAddRow, onAddTagsRow }: EmptyRowPlaceholderProp
       onMouseEnter={() => setHoveredEmpty(true)}
       onMouseLeave={() => setHoveredEmpty(false)}
     >
-      <div className="text-center py-6 text-muted-foreground border-2 border-dashed rounded-lg relative">
+      <div className="text-muted-foreground relative rounded-lg border-2 border-dashed py-6 text-center">
         <p className="text-sm">暂无内容，悬浮到此处添加行</p>
 
         {hoveredEmpty && (
-          <FloatingActionBar onAddRow={onAddRow} onAddTagsRow={onAddTagsRow} onDelete={() => { }} />
+          <FloatingActionBar onAddRow={onAddRow} onAddTagsRow={onAddTagsRow} onDelete={() => {}} />
         )}
       </div>
     </div>
   )
 }
 
-function ContentRowEditor({ row, onUpdate, onRemove, onUpdateElement, onAddRow, onAddTagsRow }: ContentRowEditorProps) {
+function ContentRowEditor({
+  row,
+  onUpdate,
+  onRemove,
+  onUpdateElement,
+  onAddRow,
+  onAddTagsRow,
+}: ContentRowEditorProps) {
   const [hoveredRow, setHoveredRow] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
@@ -474,7 +524,7 @@ function ContentRowEditor({ row, onUpdate, onRemove, onUpdateElement, onAddRow, 
         onMouseEnter={() => setHoveredRow(true)}
         onMouseLeave={() => setHoveredRow(false)}
       >
-        <div className="border rounded-lg bg-white relative">
+        <div className="relative rounded-lg border bg-white">
           {row.type === 'tags' ? (
             <div className="p-2">
               <TagInput
@@ -492,10 +542,7 @@ function ContentRowEditor({ row, onUpdate, onRemove, onUpdateElement, onAddRow, 
               }}
             >
               {row.elements.map((element, index) => (
-                <div
-                  key={element.id}
-                  className={index < row.elements.length - 1 ? "border-r" : ""}
-                >
+                <div key={element.id} className={index < row.elements.length - 1 ? 'border-r' : ''}>
                   <RichTextInput
                     element={element}
                     onChange={(updates) => onUpdateElement(element.id, updates)}
@@ -521,9 +568,7 @@ function ContentRowEditor({ row, onUpdate, onRemove, onUpdateElement, onAddRow, 
         <AlertDialogContent className="max-w-sm">
           <AlertDialogHeader>
             <AlertDialogTitle>确认删除</AlertDialogTitle>
-            <AlertDialogDescription>
-              您确定要删除这一行吗？此操作无法撤销。
-            </AlertDialogDescription>
+            <AlertDialogDescription>您确定要删除这一行吗？此操作无法撤销。</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>取消</AlertDialogCancel>
