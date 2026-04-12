@@ -1,7 +1,9 @@
 use tauri::Manager;
 
-mod ai_service;
+mod ai_chat;
 mod ai_config;
+mod ai_service;
+mod ai_snapshot;
 mod pdf;
 mod resume;
 mod storage;
