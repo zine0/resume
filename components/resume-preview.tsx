@@ -2,6 +2,7 @@
 
 import { useLayoutEffect, useRef, useState } from "react"
 import { Icon } from "@iconify/react"
+import DOMPurify from "dompurify"
 import type { ResumeData } from "@/types/resume"
 import RichTextRenderer from "./rich-text-renderer"
 
@@ -13,6 +14,12 @@ interface ResumePreviewProps {
  * 简历预览组件
  */
 export default function ResumePreview({ resumeData }: ResumePreviewProps) {
+  const sanitizeIcon = (html: string) =>
+    DOMPurify.sanitize(html, {
+      ADD_TAGS: ["path", "circle", "rect", "ellipse", "line", "polyline", "polygon", "g", "defs", "use"],
+      ADD_ATTR: ["d", "fill", "stroke", "stroke-width", "cx", "cy", "r", "x", "y", "width", "height", "viewBox", "points", "transform", "opacity", "fill-rule", "clip-rule", "id"],
+    })
+
   const isAsciiOnly = (str: string | undefined) => !!str && /^[\x00-\x7F]+$/.test(str);
   const leftRef = useRef<HTMLDivElement | null>(null);
   const rightRef = useRef<HTMLDivElement | null>(null);
@@ -279,7 +286,7 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
                         className="resume-icon w-[1em] h-[1em] shrink-0"
                         fill="black"
                         viewBox="0 0 24 24"
-                        dangerouslySetInnerHTML={{ __html: item.icon }}
+                        dangerouslySetInnerHTML={{ __html: sanitizeIcon(item.icon) }}
                       />
                     )}
                     {resumeData.personalInfoSection?.showPersonalInfoLabels !== false && (
@@ -332,7 +339,7 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
                           className="resume-icon w-[1em] h-[1em] flex-shrink-0"
                           fill="black"
                           viewBox="0 0 24 24"
-                          dangerouslySetInnerHTML={{ __html: item.icon }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeIcon(item.icon) }}
                         />
                       )}
                       {resumeData.personalInfoSection?.showPersonalInfoLabels !== false && (
@@ -370,7 +377,7 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
                       className="resume-icon w-[1em] h-[1em] shrink-0"
                       fill="black"
                       viewBox="0 0 24 24"
-                      dangerouslySetInnerHTML={{ __html: item.icon }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeIcon(item.icon) }}
                     />
                   )}
                   {resumeData.personalInfoSection?.showPersonalInfoLabels !== false && (
@@ -417,7 +424,7 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
                           className="resume-icon w-[1em] h-[1em] flex-shrink-0"
                           fill="black"
                           viewBox="0 0 24 24"
-                          dangerouslySetInnerHTML={{ __html: item.icon }}
+                          dangerouslySetInnerHTML={{ __html: sanitizeIcon(item.icon) }}
                         />
                       )}
                       {resumeData.personalInfoSection?.showPersonalInfoLabels !== false && (
@@ -471,7 +478,7 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
                     width={20}
                     height={20}
                     viewBox="0 0 24 24"
-                    dangerouslySetInnerHTML={{ __html: module.icon }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeIcon(module.icon) }}
                   />
                 )}
                 {module.title}
