@@ -1,6 +1,6 @@
 ﻿/* eslint-disable @next/next/no-img-element */
 
-import { useLayoutEffect, useRef, useState } from "react"
+import { useLayoutEffect, useRef, useState, memo } from "react"
 import { Icon } from "@iconify/react"
 import DOMPurify from "dompurify"
 import type { ResumeData } from "@/types/resume"
@@ -13,7 +13,7 @@ interface ResumePreviewProps {
 /**
  * 简历预览组件
  */
-export default function ResumePreview({ resumeData }: ResumePreviewProps) {
+function ResumePreview({ resumeData }: ResumePreviewProps) {
   const sanitizeIcon = (html: string) =>
     DOMPurify.sanitize(html, {
       ADD_TAGS: ["path", "circle", "rect", "ellipse", "line", "polyline", "polygon", "g", "defs", "use"],
@@ -534,3 +534,8 @@ export default function ResumePreview({ resumeData }: ResumePreviewProps) {
     </div>
   );
 }
+
+const MemoizedResumePreview = memo(ResumePreview)
+MemoizedResumePreview.displayName = "ResumePreview"
+
+export default MemoizedResumePreview
