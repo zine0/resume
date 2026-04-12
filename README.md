@@ -1,4 +1,4 @@
-﻿# 简历生成器
+# 简历生成器
 
 > ⭐⭐⭐ **如果这个项目对您有帮助，请给个小星星！** 您的支持是我持续改进和添加新功能的动力。
 
@@ -204,6 +204,12 @@ pnpm tauri:build
 - 补充 Windows / macOS / Linux 的打包验证
 - 增加更多简历模板与 AI 场景
 
-## 许可证
+## 友情链接
 
-MIT
+- [linux.do](https://linux.do/) - 真诚 、友善 、团结 、专业 ，共建你我引以为荣之社区。
+- [wzdnzd/resume](https://github.com/wzdnzd/resume) - 本项目fork自该项目
+- [magicyan418/resume-builder](https://github.com/magicyan418/resume-builder) - 最初的创造者
+
+---
+
+感谢以上项目的作者和社区 ❤️
