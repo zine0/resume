@@ -14,13 +14,38 @@ import { Icon } from '@iconify/react'
 import { useToast } from '@/hooks/use-toast'
 import { aiAnalyzeJD, applyAiPatchToResumeData, JD_SUGGESTION_MODULE_TITLE } from '@/lib/ai-service'
 import type { ResumeData } from '@/types/resume'
-import type { JDAnalysisResult } from '@/types/ai'
+import type { AiResumePatch, JDAnalysisResult, JDAnalysisSuggestion } from '@/types/ai'
 
 interface JDAnalysisSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   resumeData: ResumeData
   onCreateTailoredResume?: (data: ResumeData) => Promise<void> | void
+  onApplySuggestion?: (data: ResumeData, suggestion: JDAnalysisSuggestion) => Promise<void> | void
+}
+
+function isSuggestionDirectlyApplicable(suggestion: JDAnalysisSuggestion) {
+  return Boolean(suggestion.targetKind && suggestion.targetId)
+}
+
+function buildSuggestionPatch(suggestion: JDAnalysisSuggestion): AiResumePatch | null {
+  if (!suggestion.targetKind || !suggestion.targetId) {
+    return null
+  }
+
+  return {
+    warnings: [],
+    operations: [
+      {
+        targetKind: suggestion.targetKind,
+        targetId: suggestion.targetId,
+        contentKind: suggestion.contentKind,
+        text: suggestion.suggestedText,
+        tags: suggestion.tags,
+        salaryRange: suggestion.salaryRange,
+      },
+    ],
+  }
 }
 
 export default function JDAnalysisSheet({
@@ -28,12 +53,14 @@ export default function JDAnalysisSheet({
   onOpenChange,
   resumeData,
   onCreateTailoredResume,
+  onApplySuggestion,
 }: JDAnalysisSheetProps) {
   const { toast } = useToast()
   const [jdText, setJdText] = useState('')
   const [analysisResult, setAnalysisResult] = useState<JDAnalysisResult | null>(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [creatingCopy, setCreatingCopy] = useState(false)
+  const [applyingSuggestionId, setApplyingSuggestionId] = useState<string | null>(null)
 
   const handleAnalyze = async () => {
     if (!jdText.trim()) {
@@ -60,6 +87,38 @@ export default function JDAnalysisSheet({
       toast({ title: '建议文本已复制到剪贴板' })
     } catch {
       toast({ title: '复制失败', variant: 'destructive' })
+    }
+  }
+
+  const handleApplyToCurrentResume = async (suggestion: JDAnalysisSuggestion, index: number) => {
+    const patch = buildSuggestionPatch(suggestion)
+    if (!patch) {
+      toast({
+        title: '该建议暂不支持直接应用',
+        description: '请复制后手动调整，或生成 JD 定制副本。',
+      })
+      return
+    }
+
+    if (!onApplySuggestion) {
+      toast({ title: '当前页面不支持直接应用', variant: 'destructive' })
+      return
+    }
+
+    const applyKey = `${suggestion.targetKind}-${suggestion.targetId}-${index}`
+    setApplyingSuggestionId(applyKey)
+    try {
+      const { data } = applyAiPatchToResumeData(resumeData, patch, { keepCreatedAt: true })
+      await onApplySuggestion(data, suggestion)
+      toast({
+        title: '已应用到当前简历',
+        description: '编辑区内容已同步更新，记得按需保存或继续微调。',
+      })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '应用建议失败'
+      toast({ title: '应用失败', description: message, variant: 'destructive' })
+    } finally {
+      setApplyingSuggestionId(null)
     }
   }
 
@@ -197,32 +256,80 @@ export default function JDAnalysisSheet({
 
               {analysisResult.suggestions.length > 0 && (
                 <div className="space-y-4">
-                  <h3 className="text-sm font-medium">
-                    优化建议 ({analysisResult.suggestions.length})
-                  </h3>
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">
+                      优化建议 ({analysisResult.suggestions.length})
+                    </h3>
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                      可直接定位到字段的建议支持“应用”，其余建议仍可复制，或统一生成 JD 定制副本。
+                    </p>
+                  </div>
                   <div className="space-y-4">
                     {analysisResult.suggestions.map((s, i) => (
                       <Card key={i} className="space-y-3 p-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">
-                            {s.section}
-                            {s.field && <span className="text-muted-foreground"> · {s.field}</span>}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleApplySuggestion(s.suggestedText)}
-                            className="gap-1.5 bg-transparent"
-                          >
-                            <Icon icon="mdi:content-copy" className="h-3.5 w-3.5" />
-                            复制
-                          </Button>
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-medium">
+                                {s.section}
+                                {s.field && (
+                                  <span className="text-muted-foreground"> · {s.field}</span>
+                                )}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  isSuggestionDirectlyApplicable(s)
+                                    ? 'bg-primary/5 text-primary border-primary/20'
+                                    : 'text-muted-foreground'
+                                }
+                              >
+                                {isSuggestionDirectlyApplicable(s) ? '可直接应用' : '需手动处理'}
+                              </Badge>
+                            </div>
+                            {s.originalText && (
+                              <p className="text-muted-foreground line-clamp-2 text-xs">
+                                原文: {s.originalText}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 self-start">
+                            <Button
+                              size="sm"
+                              disabled={
+                                !onApplySuggestion ||
+                                !isSuggestionDirectlyApplicable(s) ||
+                                applyingSuggestionId === `${s.targetKind}-${s.targetId}-${i}`
+                              }
+                              onClick={() => void handleApplyToCurrentResume(s, i)}
+                              className="gap-1.5"
+                            >
+                              {applyingSuggestionId === `${s.targetKind}-${s.targetId}-${i}` ? (
+                                <>
+                                  <Icon
+                                    icon="lucide:loader-2"
+                                    className="h-3.5 w-3.5 animate-spin"
+                                  />
+                                  应用中...
+                                </>
+                              ) : (
+                                <>
+                                  <Icon icon="mdi:check-bold" className="h-3.5 w-3.5" />
+                                  应用
+                                </>
+                              )}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleApplySuggestion(s.suggestedText)}
+                              className="gap-1.5 bg-transparent"
+                            >
+                              <Icon icon="mdi:content-copy" className="h-3.5 w-3.5" />
+                              复制
+                            </Button>
+                          </div>
                         </div>
-                        {s.originalText && (
-                          <p className="text-muted-foreground line-clamp-2 text-xs">
-                            原文: {s.originalText}
-                          </p>
-                        )}
                         <p className="text-sm leading-relaxed">{s.suggestedText}</p>
                         {s.reason && (
                           <p className="text-muted-foreground text-xs">理由: {s.reason}</p>

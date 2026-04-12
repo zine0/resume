@@ -121,12 +121,14 @@ export function applyAiPatchToResumeData(
   options?: {
     fallbackModuleTitle?: string
     titleOverride?: string
+    keepCreatedAt?: boolean
   },
 ): ApplyAiPatchResult {
   const next = cloneResumeData(resumeData)
   const now = new Date().toISOString()
+  const createdAt = next.createdAt
   next.title = options?.titleOverride?.trim() || buildPatchedTitle(next.title, patch)
-  next.createdAt = now
+  next.createdAt = options?.keepCreatedAt ? createdAt : now
   next.updatedAt = now
 
   let appliedCount = 0

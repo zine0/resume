@@ -146,6 +146,16 @@ export default function ResumeBuilder({
     })
   }, [])
 
+  const handleApplySuggestion = useCallback((data: ResumeData) => {
+    setEditorState((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        resumeData: data,
+      }
+    })
+  }, [])
+
   // 将变更在提交阶段通知父组件，避免在渲染中更新父组件
   useEffect(() => {
     if (!editorState) return
@@ -374,6 +384,7 @@ export default function ResumeBuilder({
         onOpenChange={setJdAnalysisOpen}
         resumeData={editorState.resumeData}
         onCreateTailoredResume={onCreateTailoredResume}
+        onApplySuggestion={handleApplySuggestion}
       />
     </div>
   )
