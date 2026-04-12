@@ -237,37 +237,46 @@ export default function UserCenter() {
           <h1 className="text-lg font-semibold">我的简历</h1>
           <Badge variant="secondary">{items.length}</Badge>
         </div>
-        {items.length > 0 && (
-          <div className="flex items-center gap-2">
-            <Input
-              placeholder="搜索简历名称"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              className="w-56"
-            />
-            {null}
-            <Separator orientation="vertical" className="h-6" />
-            <Button
-              variant="default"
-              className="gap-2"
-              onClick={() => document.getElementById('uc-import-file')?.click()}
-              disabled={importing}
-            >
-              <Icon icon="mdi:import" className="h-4 w-4" /> 导入
-            </Button>
-            <Button onClick={handleCreate} className="gap-2">
-              <Icon icon="mdi:plus" className="h-4 w-4" /> 创建简历
-            </Button>
-            <Button
-              variant="destructive"
-              className="gap-2"
-              disabled={selected.size === 0}
-              onClick={() => setConfirmOpen(true)}
-            >
-              <Icon icon="mdi:trash-can" className="h-4 w-4" /> 批量删除
-            </Button>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            className="gap-2 bg-transparent"
+            onClick={() => navigate('/board')}
+          >
+            <Icon icon="mdi:view-kanban-outline" className="h-4 w-4" /> 求职看板
+          </Button>
+          {items.length > 0 && (
+            <>
+              <Input
+                placeholder="搜索简历名称"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                className="w-56"
+              />
+              {null}
+              <Separator orientation="vertical" className="h-6" />
+              <Button
+                variant="default"
+                className="gap-2"
+                onClick={() => document.getElementById('uc-import-file')?.click()}
+                disabled={importing}
+              >
+                <Icon icon="mdi:import" className="h-4 w-4" /> 导入
+              </Button>
+              <Button onClick={handleCreate} className="gap-2">
+                <Icon icon="mdi:plus" className="h-4 w-4" /> 创建简历
+              </Button>
+              <Button
+                variant="destructive"
+                className="gap-2"
+                disabled={selected.size === 0}
+                onClick={() => setConfirmOpen(true)}
+              >
+                <Icon icon="mdi:trash-can" className="h-4 w-4" /> 批量删除
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <Separator />
@@ -307,6 +316,13 @@ export default function UserCenter() {
                     disabled={importing}
                   >
                     <Icon icon="mdi:import" className="h-4 w-4" /> 导入
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="shrink-0 gap-2"
+                    onClick={() => navigate('/board')}
+                  >
+                    <Icon icon="mdi:view-kanban-outline" className="h-4 w-4" /> 求职看板
                   </Button>
                   <Button
                     variant="outline"

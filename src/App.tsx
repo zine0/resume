@@ -8,6 +8,8 @@ import EditNew from './routes/EditNew'
 import EditResume from './routes/EditResume'
 import ViewResume from './routes/ViewResume'
 import Print from './routes/Print'
+import Board from './routes/Board'
+import { ErrorBoundary } from '@/components/error-boundary'
 
 export default function App() {
   return (
@@ -21,6 +23,7 @@ export default function App() {
                 <Route path="/edit/new" element={<EditNew />} />
                 <Route path="/edit/:id" element={<EditResume />} />
                 <Route path="/view/:id" element={<ViewResume />} />
+                <Route path="/board" element={<Board />} />
                 <Route path="/print" element={<Print />} />
               </Routes>
               <Toaster />
@@ -31,4 +34,3 @@ export default function App() {
     </BrowserRouter>
   )
 }
-import { ErrorBoundary } from '@/components/error-boundary'
