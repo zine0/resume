@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import type { ApplicationEntry, ApplicationInput } from '@/types/application'
 import type {
   JobIntentionItem,
   JobIntentionSection,
@@ -196,4 +197,47 @@ export async function loadDefaultTemplate(): Promise<ResumeData> {
 
 export function loadExampleTemplate(): Promise<ResumeData | null> {
   return loadTemplateFrom('/example.json')
+}
+
+export async function getAllApplications(): Promise<ApplicationEntry[]> {
+  try {
+    return await invoke<ApplicationEntry[]>('get_all_applications')
+  } catch (e) {
+    throw mapTauriError(e)
+  }
+}
+
+export async function getApplicationById(id: string): Promise<ApplicationEntry | null> {
+  try {
+    return await invoke<ApplicationEntry | null>('get_application_by_id', { id })
+  } catch (e) {
+    throw mapTauriError(e)
+  }
+}
+
+export async function createApplication(data: ApplicationInput): Promise<ApplicationEntry> {
+  try {
+    return await invoke<ApplicationEntry>('create_application', { data })
+  } catch (e) {
+    throw mapTauriError(e)
+  }
+}
+
+export async function updateApplication(
+  id: string,
+  data: ApplicationInput,
+): Promise<ApplicationEntry> {
+  try {
+    return await invoke<ApplicationEntry>('update_application', { id, data })
+  } catch (e) {
+    throw mapTauriError(e)
+  }
+}
+
+export async function deleteApplications(ids: string[]): Promise<void> {
+  try {
+    await invoke<void>('delete_applications', { ids })
+  } catch (e) {
+    throw mapTauriError(e)
+  }
 }
