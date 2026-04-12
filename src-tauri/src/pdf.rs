@@ -57,6 +57,9 @@ pub async fn generate_pdf(
     fs::write(&save_path, pdf_data).map_err(|e| format!("Failed to write PDF: {}", e))?;
 
     let _ = fs::remove_file(&temp_path);
+    if let Err(e) = fs::remove_file(&temp_path) {
+        eprintln!("Warning: failed to remove temp file {:?}: {}", temp_path, e);
+    }
 
     Ok(save_path.to_string_lossy().to_string())
 }
