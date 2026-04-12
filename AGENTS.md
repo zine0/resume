@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-This project is a desktop resume builder built with **Tauri v2 + Vite + React Router**. Users can create, edit, preview, and export resumes as PDF, PNG, JPG, WEBP, SVG, and JSON. The frontend is a React single-page application, while persistence and PDF generation are handled by Rust commands exposed through Tauri.
+This project is a desktop resume builder built with **Tauri v2 + Vite + React Router**. Users can locally create, manage, edit, preview, and export multiple resumes as PDF, PNG, JPG, WEBP, SVG, and JSON, with configurable AI-assisted resume workflows also available in the app. The frontend is a React single-page application, while persistence and PDF generation are handled by Rust commands exposed through Tauri.
 
 **Stack**: Tauri v2 · Vite 6 · React 19 · React Router 7 · TypeScript (strict) · Tailwind CSS v4 · Shadcn UI · Tiptap 3 · Rust · `headless_chrome` · `@hello-pangea/dnd` · Iconify
 

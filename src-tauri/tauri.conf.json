@@ -1,48 +1,48 @@
 {
-    "$schema": "../gen/schemas/desktop-schema.json",
-    "identifier": "com.resumebuilder.release",
-    "productName": "ResumeBuilder",
-    "version": "0.1.0",
-    "build": {
-        "beforeDevCommand": "pnpm dev",
-        "beforeBuildCommand": "pnpm build",
-        "devUrl": "http://localhost:5173",
-        "frontendDist": "../dist"
-    },
-    "bundle": {
-        "active": true,
-        "targets": [
-            "nsis",
-            "app",
-            "deb",
-            "appimage",
-            "dmg"
-        ],
-        "icon": [
-            "icons/32x32.png",
-            "icons/128x128.png",
-            "icons/128x128@2x.png",
-            "icons/icon.icns",
-            "icons/icon.ico"
-        ]
-    },
-    "app": {
-        "windows": [
-            {
-                "label": "main",
-                "title": "简历生成器",
-                "width": 1280,
-                "height": 800,
-                "minWidth": 1024,
-                "minHeight": 768,
-                "resizable": true,
-                "center": true
-            }
-        ]
-    },
-    "plugins": {
-        "fs": {
-            "requireLiteralLeadingDot": false
-        }
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "com.resumebuilder.release",
+  "productName": "ResumeBuilder",
+  "version": "0.2.0",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "nsis",
+      "app",
+      "deb",
+      "appimage",
+      "dmg"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "简历生成器",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 768,
+        "resizable": true,
+        "center": true
+      }
+    ]
+  },
+  "plugins": {
+    "fs": {
+      "requireLiteralLeadingDot": false
     }
+  }
 }
