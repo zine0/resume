@@ -4,6 +4,7 @@ mod ai_chat;
 mod ai_config;
 mod ai_service;
 mod ai_snapshot;
+mod applications;
 mod pdf;
 mod resume;
 mod storage;
@@ -36,6 +37,11 @@ pub fn run() {
             storage::create_resume_from_data,
             storage::update_resume,
             storage::delete_resumes,
+            applications::get_all_applications,
+            applications::get_application_by_id,
+            applications::create_application,
+            applications::update_application,
+            applications::delete_applications,
             pdf::generate_pdf,
         ])
         .setup(|app| {
