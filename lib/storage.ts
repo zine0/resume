@@ -183,6 +183,7 @@ async function loadTemplateFrom(path: string): Promise<ResumeData | null> {
     const content = await res.text()
     return await importResumeFile(content)
   } catch {
+    console.warn("Failed to load template from:", path)
     return null
   }
 }
