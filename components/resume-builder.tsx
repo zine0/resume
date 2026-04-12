@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Icon } from "@iconify/react"
 import type { ResumeData, EditorState } from "@/types/resume"
+import type { AutoSaveStatus } from "@/hooks/use-auto-save"
 import { loadDefaultTemplate, loadExampleTemplate } from "@/lib/storage"
 import ResumePreview from "./resume-preview"
 import PersonalInfoEditor from "./personal-info-editor"
@@ -73,6 +74,8 @@ export default function ResumeBuilder({
   onBack,
   onCreateTailoredResume,
   onCreateOptimizedResume,
+  autoSaveStatus,
+  autoSaveLastSaved,
 }: {
   initialData?: ResumeData
   template?: "default" | "example"
@@ -81,6 +84,8 @@ export default function ResumeBuilder({
   onBack?: () => void
   onCreateTailoredResume?: (data: ResumeData) => void | Promise<void>
   onCreateOptimizedResume?: (data: ResumeData) => void | Promise<void>
+  autoSaveStatus?: AutoSaveStatus
+  autoSaveLastSaved?: string | null
 }) {
   const [editorState, setEditorState] = useState<EditorState | null>(() => {
     if (!initialData) return null
@@ -207,6 +212,30 @@ export default function ResumeBuilder({
               保存
             </Button>
           ) : null}
+
+          {/* 自动保存状态 */}
+          {autoSaveStatus && autoSaveStatus !== "idle" && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+              {autoSaveStatus === "saving" && (
+                <>
+                  <Icon icon="mdi:loading" className="w-3 h-3 animate-spin" />
+                  保存中...
+                </>
+              )}
+              {autoSaveStatus === "saved" && (
+                <>
+                  <Icon icon="mdi:check-circle" className="w-3 h-3 text-green-500" />
+                  已保存{autoSaveLastSaved ? ` ${autoSaveLastSaved}` : ""}
+                </>
+              )}
+              {autoSaveStatus === "error" && (
+                <>
+                  <Icon icon="mdi:alert-circle" className="w-3 h-3 text-destructive" />
+                  自动保存失败
+                </>
+              )}
+            </span>
+          )}
 
           {/* 导出 */}
           <ExportButton

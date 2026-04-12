@@ -4,30 +4,36 @@ import ResumeBuilder from "@/components/resume-builder"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@iconify/react"
 import type { ResumeData, StoredResume } from "@/types/resume"
-import { createEntryFromData, getResumeById, updateEntryData, StorageError } from "@/lib/storage"
+import { createEntryFromData, getResumeById, StorageError } from "@/lib/storage"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { useToast } from "@/hooks/use-toast"
 
 export default function EditResume() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { toast } = useToast()
-  const [, setCurrentData] = useState<ResumeData | null>(null)
+  const [currentData, setCurrentData] = useState<ResumeData | null>(null)
   const [entry, setEntry] = useState<StoredResume | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const { status: autoSaveStatus, lastSavedText, saveNow } = useAutoSave(id, currentData)
+
   useEffect(() => {
-    if (!id) { setLoading(false); return }
+    if (!id) {
+      setLoading(false)
+      return
+    }
     getResumeById(id).then((e) => {
       setEntry(e)
       setLoading(false)
     })
   }, [id])
 
-  const handleSave = async (data: ResumeData) => {
+  const handleSave = async () => {
     try {
-      if (!id) return
-      const updated = await updateEntryData(id, data)
-      toast({ title: "保存成功", description: new Date(updated.updatedAt).toLocaleString() })
+      await saveNow()
+      // saveNow already updates the status indicator; show toast for manual save only
+      toast({ title: "保存成功" })
     } catch (e: unknown) {
       if (e instanceof StorageError && e.code === "QUOTA_EXCEEDED") {
         toast({
@@ -70,9 +76,11 @@ export default function EditResume() {
         initialData={entry.resumeData}
         onChange={setCurrentData}
         onBack={() => navigate("/")}
-        onSave={(data) => handleSave(data)}
+        onSave={() => handleSave()}
         onCreateTailoredResume={(data) => handleCreateResumeCopy(data)}
         onCreateOptimizedResume={(data) => handleCreateResumeCopy(data)}
+        autoSaveStatus={autoSaveStatus}
+        autoSaveLastSaved={lastSavedText}
       />
     </main>
   )
