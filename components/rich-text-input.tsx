@@ -1,4 +1,4 @@
-import { useEffect } from "react"
+import { useEffect } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { TextStyle } from '@tiptap/extension-text-style'
@@ -10,8 +10,8 @@ import Link from '@tiptap/extension-link'
 import { Extension } from '@tiptap/core'
 import { Plugin } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
-import type { ModuleContentElement, JSONContent } from "@/types/resume"
-import { useToolbarManager } from "./rich-text-toolbar-manager"
+import type { ModuleContentElement, JSONContent } from '@/types/resume'
+import { useToolbarManager } from './rich-text-toolbar-manager'
 
 interface RichTextInputProps {
   element: ModuleContentElement
@@ -33,7 +33,7 @@ const FontSize = Extension.create({
             default: null,
             parseHTML: (element: HTMLElement) => element.style.fontSize || null,
             renderHTML: (attributes: Record<string, unknown>) => {
-              const fontSize = typeof attributes.fontSize === 'string' ? attributes.fontSize : null;
+              const fontSize = typeof attributes.fontSize === 'string' ? attributes.fontSize : null
               if (!fontSize) {
                 return {}
               }
@@ -67,11 +67,11 @@ const PlainTextPaste = Extension.create({
             if (!text || !/\r?\n/.test(text)) return false
             e.preventDefault()
             const lines = text.replace(/\r\n?/g, '\n').split('\n')
-            const content = lines.map((line) => (
+            const content = lines.map((line) =>
               line
                 ? { type: 'paragraph', content: [{ type: 'text', text: line }] }
-                : { type: 'paragraph' }
-            ))
+                : { type: 'paragraph' },
+            )
             editor.chain().focus().insertContent(content).run()
             return true
           },
@@ -95,8 +95,8 @@ const getDefaultContent = (): JSONContent => ({
 export default function RichTextInput({
   element,
   onChange,
-  placeholder = "输入内容...",
-  showBorder = true
+  placeholder = '输入内容...',
+  showBorder = true,
 }: RichTextInputProps) {
   const { registerEditor, unregisterEditor } = useToolbarManager()
 
@@ -131,8 +131,9 @@ export default function RichTextInput({
     content: element.content || getDefaultContent(),
     editorProps: {
       attributes: {
-        class: `rt-editor min-h-[40px] px-3 py-2 focus:outline-none ${showBorder ? 'border border-dashed border-teal-200 focus-within:border-teal-300' : ''
-          }`,
+        class: `rt-editor min-h-[40px] px-3 py-2 focus:outline-none ${
+          showBorder ? 'border border-dashed border-teal-200 focus-within:border-teal-300' : ''
+        }`,
       },
     },
     onUpdate: ({ editor }) => {
@@ -171,10 +172,7 @@ export default function RichTextInput({
 
   return (
     <div className="relative">
-      <EditorContent
-        editor={editor}
-        placeholder={placeholder}
-      />
+      <EditorContent editor={editor} placeholder={placeholder} />
     </div>
   )
 }

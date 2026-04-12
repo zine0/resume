@@ -19,25 +19,25 @@
 ## 页面示例截图
 
 1. 用户中心：本地集中管理多份简历  
-![用户中心](./docs/user-center.png)
+   ![用户中心](./docs/user-center.png)
 
 2. 编辑和预览：边编辑边查看渲染效果  
-![编辑和预览界面](./docs/edit-preview.png)
+   ![编辑和预览界面](./docs/edit-preview.png)
 
 3. 仅编辑：专注于内容编写  
-![仅编辑](./docs/edit-only.png)
+   ![仅编辑](./docs/edit-only.png)
 
 4. 仅预览：查看最终展示效果  
-![仅预览](./docs/preview-only.png)
+   ![仅预览](./docs/preview-only.png)
 
 5. 自由布局：支持多种布局和模块组合  
-![自由布局](./docs/multi-line.png)
+   ![自由布局](./docs/multi-line.png)
 
 6. 多种导出方式：不同成品满足不同投递需求  
-![导出方式](./docs/export.png)
+   ![导出方式](./docs/export.png)
 
 7. 标签功能：快速表达项目、技能或亮点  
-![标签添加](./docs/tags.png)
+   ![标签添加](./docs/tags.png)
 
 ## 技术栈
 

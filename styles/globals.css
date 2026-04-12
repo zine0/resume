@@ -124,11 +124,11 @@
 
 /* Resume editor layout */
 .resume-editor {
-  @apply flex flex-col h-screen overflow-hidden;
+  @apply flex h-screen flex-col overflow-hidden;
 }
 
 .editor-toolbar {
-  @apply flex items-center justify-between px-6 py-3 border-b bg-background shrink-0 flex-wrap gap-2;
+  @apply bg-background flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-6 py-3;
 }
 
 .editor-content {
@@ -136,11 +136,11 @@
 }
 
 .editor-panel {
-  @apply overflow-y-auto flex-1 border-r;
+  @apply flex-1 overflow-y-auto border-r;
 }
 
 .preview-panel {
-  @apply overflow-y-auto flex-1 p-6 bg-muted/30;
+  @apply bg-muted/30 flex-1 overflow-y-auto p-6;
 }
 
 .section-card {
@@ -148,11 +148,11 @@
 }
 
 .section-header {
-  @apply flex items-center justify-between mb-4;
+  @apply mb-4 flex items-center justify-between;
 }
 
 .section-title {
-  @apply font-medium text-sm;
+  @apply text-sm font-medium;
 }
 
 /* Print: hide editor chrome, expand preview to full page */

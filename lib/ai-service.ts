@@ -1,5 +1,5 @@
-import { invoke } from "@tauri-apps/api/core"
-import { markdownToRichContent } from "@/lib/markdown"
+import { invoke } from '@tauri-apps/api/core'
+import { markdownToRichContent } from '@/lib/markdown'
 import type {
   AiPatchOperation,
   AiPatchTargetKind,
@@ -8,51 +8,56 @@ import type {
   AiRewriteForJdResult,
   JDAnalysisResult,
   PolishMode,
-} from "@/types/ai"
-import type { ModuleContentRow, ResumeData } from "@/types/resume"
+} from '@/types/ai'
+import type { ModuleContentRow, ResumeData } from '@/types/resume'
 
-const RESUME_TITLE_TARGET_ID = "__resume_title__"
-const JD_SUGGESTION_MODULE_TITLE = "JD 定制建议"
+const RESUME_TITLE_TARGET_ID = '__resume_title__'
+const JD_SUGGESTION_MODULE_TITLE = 'JD 定制建议'
 
 function cloneResumeData(data: ResumeData): ResumeData {
-  return typeof structuredClone === "function"
+  return typeof structuredClone === 'function'
     ? structuredClone(data)
-    : JSON.parse(JSON.stringify(data)) as ResumeData
+    : (JSON.parse(JSON.stringify(data)) as ResumeData)
 }
 
 function buildPatchedTitle(title: string, patch: AiResumePatch): string {
   const titleOperation = patch.operations.find(
-    (operation) => operation.targetKind === "resumeTitle" && operation.targetId === RESUME_TITLE_TARGET_ID,
+    (operation) =>
+      operation.targetKind === 'resumeTitle' && operation.targetId === RESUME_TITLE_TARGET_ID,
   )
 
   return titleOperation?.text?.trim() || title
 }
 
 function applyOperationToResume(next: ResumeData, operation: AiPatchOperation): boolean {
-  if (operation.targetKind === "resumeTitle") {
+  if (operation.targetKind === 'resumeTitle') {
     if (!operation.text?.trim()) return false
     next.title = operation.text.trim()
     return true
   }
 
-  if (operation.targetKind === "personalInfo") {
-    const item = next.personalInfoSection.personalInfo.find((candidate) => candidate.id === operation.targetId)
+  if (operation.targetKind === 'personalInfo') {
+    const item = next.personalInfoSection.personalInfo.find(
+      (candidate) => candidate.id === operation.targetId,
+    )
     if (!item || !operation.text?.trim()) return false
     item.value.content = operation.text.trim()
     return true
   }
 
-  if (operation.targetKind === "jobIntention") {
-    const item = next.jobIntentionSection?.items.find((candidate) => candidate.id === operation.targetId)
+  if (operation.targetKind === 'jobIntention') {
+    const item = next.jobIntentionSection?.items.find(
+      (candidate) => candidate.id === operation.targetId,
+    )
     if (!item || !operation.text?.trim()) return false
     item.value = operation.text.trim()
-    if (operation.contentKind === "salary" && operation.salaryRange) {
+    if (operation.contentKind === 'salary' && operation.salaryRange) {
       item.salaryRange = operation.salaryRange
     }
     return true
   }
 
-  if (operation.targetKind === "moduleElement") {
+  if (operation.targetKind === 'moduleElement') {
     for (const module of next.modules) {
       for (const row of module.rows) {
         const element = row.elements.find((candidate) => candidate.id === operation.targetId)
@@ -64,14 +69,14 @@ function applyOperationToResume(next: ResumeData, operation: AiPatchOperation): 
     return false
   }
 
-  if (operation.targetKind === "moduleTags") {
+  if (operation.targetKind === 'moduleTags') {
     for (const module of next.modules) {
       for (const row of module.rows) {
         if (row.id !== operation.targetId) continue
         const tags = operation.tags?.map((tag) => tag.trim()).filter(Boolean)
         if (!tags?.length) return false
         row.tags = tags
-        row.type = "tags"
+        row.type = 'tags'
         return true
       }
     }
@@ -86,13 +91,12 @@ function nextSyntheticId(prefix: string): string {
 }
 
 function buildSuggestionRow(operation: AiPatchOperation, index: number): ModuleContentRow {
-  const text = operation.contentKind === "tags"
-    ? (operation.tags || []).join("、")
-    : (operation.text || "")
+  const text =
+    operation.contentKind === 'tags' ? (operation.tags || []).join('、') : operation.text || ''
 
   return {
     id: nextSyntheticId(`jd-suggestion-row-${index}`),
-    type: "rich",
+    type: 'rich',
     columns: 1,
     order: index,
     elements: [
@@ -131,13 +135,15 @@ export function applyAiPatchToResumeData(
   for (const operation of patch.operations) {
     if (applyOperationToResume(next, operation)) {
       appliedCount += 1
-    } else if (operation.targetKind !== "resumeTitle") {
+    } else if (operation.targetKind !== 'resumeTitle') {
       unmatched.push(operation)
     }
   }
 
   if (unmatched.length > 0 && options?.fallbackModuleTitle) {
-    const existingModule = next.modules.find((module) => module.title === options.fallbackModuleTitle)
+    const existingModule = next.modules.find(
+      (module) => module.title === options.fallbackModuleTitle,
+    )
     const newRows = unmatched.map(buildSuggestionRow)
 
     if (existingModule) {
@@ -152,7 +158,7 @@ export function applyAiPatchToResumeData(
       next.modules = [
         ...next.modules,
         {
-          id: nextSyntheticId("jd-suggestion-module"),
+          id: nextSyntheticId('jd-suggestion-module'),
           title: options.fallbackModuleTitle,
           order: next.modules.length,
           rows: newRows,
@@ -174,25 +180,25 @@ function mapInvokeError(error: unknown, fallback: string): Error {
 
 export async function aiPolishText(text: string, mode: PolishMode): Promise<AiPolishTextResult> {
   try {
-    return await invoke<AiPolishTextResult>("ai_polish_text", { text, mode })
+    return await invoke<AiPolishTextResult>('ai_polish_text', { text, mode })
   } catch (error) {
-    throw mapInvokeError(error, "AI 处理失败")
+    throw mapInvokeError(error, 'AI 处理失败')
   }
 }
 
 export async function aiOptimizeResume(data: ResumeData): Promise<AiResumePatch> {
   try {
-    return await invoke<AiResumePatch>("ai_optimize_resume", { data })
+    return await invoke<AiResumePatch>('ai_optimize_resume', { data })
   } catch (error) {
-    throw mapInvokeError(error, "简历优化失败")
+    throw mapInvokeError(error, '简历优化失败')
   }
 }
 
 export async function aiAnalyzeJD(data: ResumeData, jd: string): Promise<JDAnalysisResult> {
   try {
-    return await invoke<JDAnalysisResult>("ai_analyze_jd", { data, jd })
+    return await invoke<JDAnalysisResult>('ai_analyze_jd', { data, jd })
   } catch (error) {
-    throw mapInvokeError(error, "JD 分析失败")
+    throw mapInvokeError(error, 'JD 分析失败')
   }
 }
 
@@ -204,7 +210,7 @@ export async function aiRewriteForJD(
   suggestion: string,
 ): Promise<AiRewriteForJdResult> {
   try {
-    return await invoke<AiRewriteForJdResult>("ai_rewrite_for_jd", {
+    return await invoke<AiRewriteForJdResult>('ai_rewrite_for_jd', {
       data,
       jd,
       targetKind,
@@ -212,15 +218,15 @@ export async function aiRewriteForJD(
       suggestion,
     })
   } catch (error) {
-    throw mapInvokeError(error, "JD 定向改写失败")
+    throw mapInvokeError(error, 'JD 定向改写失败')
   }
 }
 
 export async function aiTestConnection(): Promise<void> {
   try {
-    await invoke<void>("ai_test_connection")
+    await invoke<void>('ai_test_connection')
   } catch (error) {
-    throw mapInvokeError(error, "AI 连接测试失败")
+    throw mapInvokeError(error, 'AI 连接测试失败')
   }
 }
 

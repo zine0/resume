@@ -8,7 +8,7 @@ import TextAlign from '@tiptap/extension-text-align'
 import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
 import { Extension } from '@tiptap/core'
-import type { JSONContent } from "@/types/resume"
+import type { JSONContent } from '@/types/resume'
 
 interface RichTextRendererProps {
   content: JSONContent
@@ -28,7 +28,7 @@ const FontSize = Extension.create({
             default: null,
             parseHTML: (element: HTMLElement) => element.style.fontSize || null,
             renderHTML: (attributes: Record<string, unknown>) => {
-              const fontSize = typeof attributes.fontSize === 'string' ? attributes.fontSize : null;
+              const fontSize = typeof attributes.fontSize === 'string' ? attributes.fontSize : null
               if (!fontSize) {
                 return {}
               }
@@ -57,11 +57,7 @@ const getDefaultContent = (): JSONContent => ({
 /**
  * Read-only Tiptap renderer for preview
  */
-export default function RichTextRenderer({
-  content,
-  className = ''
-}: RichTextRendererProps) {
-
+export default function RichTextRenderer({ content, className = '' }: RichTextRendererProps) {
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [

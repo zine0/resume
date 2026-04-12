@@ -5,7 +5,7 @@ export interface PersonalInfoValue {
   /** 对应的值 */
   content: string
   /** 值类型：text（文本）或 link（链接） */
-  type?: "text" | "link"
+  type?: 'text' | 'link'
   /** 链接类型时的显示标题（仅当type为link时使用） */
   title?: string
 }
@@ -85,14 +85,18 @@ export interface JobIntentionSection {
 // Tiptap JSON Content 类型（从 @tiptap/core 导入）
 export interface JSONContent {
   type?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   attrs?: Record<string, any>
   content?: JSONContent[]
   marks?: {
     type: string
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     attrs?: Record<string, any>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: any
   }[]
   text?: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any
 }
 
@@ -173,7 +177,7 @@ export interface StoredResume {
 }
 
 /** 本地存储使用的 Key */
-export const LOCAL_STORAGE_KEY = "resume.entries"
+export const LOCAL_STORAGE_KEY = 'resume.entries'
 
 /**
  * 文件保存/导入的数据结构

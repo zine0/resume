@@ -1,6 +1,6 @@
-import { useState, useRef, KeyboardEvent } from "react"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
+import { useState, useRef, KeyboardEvent } from 'react'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 interface TagInputProps {
   value: string[]
@@ -9,8 +9,13 @@ interface TagInputProps {
   maxTags?: number
 }
 
-export default function TagInput({ value, onChange, placeholder = "输入标签后回车添加", maxTags = 20 }: TagInputProps) {
-  const [input, setInput] = useState("")
+export default function TagInput({
+  value,
+  onChange,
+  placeholder = '输入标签后回车添加',
+  maxTags = 20,
+}: TagInputProps) {
+  const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
@@ -26,12 +31,12 @@ export default function TagInput({ value, onChange, placeholder = "输入标签�
       return
     }
     onChange([...value, tag])
-    setInput("")
+    setInput('')
     if (error) setError(null)
   }
 
   const removeTag = (tag: string) => {
-    onChange(value.filter(t => t !== tag))
+    onChange(value.filter((t) => t !== tag))
     if (error) setError(null)
   }
 
@@ -46,11 +51,11 @@ export default function TagInput({ value, onChange, placeholder = "输入标签�
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-1 p-2 mb-1">
-      {value.map(tag => (
+    <div className="mb-1 flex flex-wrap items-center gap-1 p-2">
+      {value.map((tag) => (
         <span
           key={tag}
-          className="inline-flex items-center gap-1 border border-gray-300 text-gray-600 rounded-full px-2 py-0.5 text-xs"
+          className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-2 py-0.5 text-xs text-gray-600"
         >
           {tag}
           <Button
@@ -61,7 +66,12 @@ export default function TagInput({ value, onChange, placeholder = "输入标签�
             onClick={() => removeTag(tag)}
             aria-label={`删除 ${tag}`}
           >
-            <svg className="w-3 h-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><path fill="currentColor" d="M310.6 150.6c12.5 12.5 12.5 32.8 0 45.3L205.3 301.3 310.6 406.6c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L160 346.7 54.6 452c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L114.7 301.3 9.4 195.9C-3.1 183.4-3.1 163 9.4 150.6s32.8-12.5 45.3 0L160 256.7 265.4 150.6c12.5-12.5 32.8-12.5 45.2 0z" /></svg>
+            <svg className="h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512">
+              <path
+                fill="currentColor"
+                d="M310.6 150.6c12.5 12.5 12.5 32.8 0 45.3L205.3 301.3 310.6 406.6c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L160 346.7 54.6 452c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L114.7 301.3 9.4 195.9C-3.1 183.4-3.1 163 9.4 150.6s32.8-12.5 45.3 0L160 256.7 265.4 150.6c12.5-12.5 32.8-12.5 45.2 0z"
+              />
+            </svg>
           </Button>
         </span>
       ))}
@@ -72,11 +82,9 @@ export default function TagInput({ value, onChange, placeholder = "输入标签�
         onKeyDown={onKeyDown}
         placeholder={placeholder}
         aria-invalid={!!error}
-        className={`h-7 flex-1 min-w-[160px] ${error ? 'border-red-500 focus-visible:border-red-500 ring-1 ring-red-500/20' : 'border-transparent focus-visible:border-border focus-visible:ring-0'}`}
+        className={`h-7 min-w-[160px] flex-1 ${error ? 'border-red-500 ring-1 ring-red-500/20 focus-visible:border-red-500' : 'focus-visible:border-border border-transparent focus-visible:ring-0'}`}
       />
-      {error && (
-        <div className="w-full text-xs text-red-600 mt-1">{error}</div>
-      )}
+      {error && <div className="mt-1 w-full text-xs text-red-600">{error}</div>}
     </div>
   )
 }

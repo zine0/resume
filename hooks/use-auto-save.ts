@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from "react"
-import type { ResumeData } from "@/types/resume"
-import { updateEntryData } from "@/lib/storage"
+import { useState, useEffect, useRef, useCallback } from 'react'
+import type { ResumeData } from '@/types/resume'
+import { updateEntryData } from '@/lib/storage'
 
-export type AutoSaveStatus = "idle" | "saving" | "saved" | "error"
+export type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 interface AutoSaveResult {
   /** Current auto-save status */
@@ -24,7 +24,7 @@ export function useAutoSave(
 ): AutoSaveResult {
   const { debounceMs = 2000 } = options
 
-  const [status, setStatus] = useState<AutoSaveStatus>("idle")
+  const [status, setStatus] = useState<AutoSaveStatus>('idle')
   const [lastSavedText, setLastSavedText] = useState<string | null>(null)
 
   const lastSavedJson = useRef<string | null>(null)
@@ -44,14 +44,14 @@ export function useAutoSave(
       const json = JSON.stringify(currentData)
       if (json === lastSavedJson.current) return
 
-      setStatus("saving")
+      setStatus('saving')
       try {
         await updateEntryData(id, currentData)
         lastSavedJson.current = json
         setLastSavedText(new Date().toLocaleTimeString())
-        setStatus("saved")
+        setStatus('saved')
       } catch (e) {
-        setStatus("error")
+        setStatus('error')
         if (options.throwOnError) throw e
       }
     },
@@ -82,7 +82,7 @@ export function useAutoSave(
   useEffect(() => {
     lastSavedJson.current = null
     setLastSavedText(null)
-    setStatus("idle")
+    setStatus('idle')
   }, [id])
 
   const saveNow = useCallback(async () => {

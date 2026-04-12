@@ -1,27 +1,27 @@
-import { MarkdownManager } from "@tiptap/markdown"
-import StarterKit from "@tiptap/starter-kit"
-import { TextStyle } from "@tiptap/extension-text-style"
-import { Color } from "@tiptap/extension-color"
-import { FontFamily } from "@tiptap/extension-font-family"
-import TextAlign from "@tiptap/extension-text-align"
-import Underline from "@tiptap/extension-underline"
-import Link from "@tiptap/extension-link"
-import { Extension } from "@tiptap/core"
-import type { JSONContent } from "@/types/resume"
+import { MarkdownManager } from '@tiptap/markdown'
+import StarterKit from '@tiptap/starter-kit'
+import { TextStyle } from '@tiptap/extension-text-style'
+import { Color } from '@tiptap/extension-color'
+import { FontFamily } from '@tiptap/extension-font-family'
+import TextAlign from '@tiptap/extension-text-align'
+import Underline from '@tiptap/extension-underline'
+import Link from '@tiptap/extension-link'
+import { Extension } from '@tiptap/core'
+import type { JSONContent } from '@/types/resume'
 
 // Custom FontSize extension — must match rich-text-input.tsx
 const FontSize = Extension.create({
-  name: "fontSize",
+  name: 'fontSize',
   addGlobalAttributes() {
     return [
       {
-        types: ["textStyle"],
+        types: ['textStyle'],
         attributes: {
           fontSize: {
             default: null,
             parseHTML: (element: HTMLElement) => element.style.fontSize || null,
             renderHTML: (attributes: Record<string, unknown>) => {
-              const fontSize = typeof attributes.fontSize === "string" ? attributes.fontSize : null
+              const fontSize = typeof attributes.fontSize === 'string' ? attributes.fontSize : null
               if (!fontSize) return {}
               return { style: `font-size: ${fontSize}` }
             },
@@ -50,11 +50,11 @@ const extensions = [
   Link.configure({
     openOnClick: false,
     HTMLAttributes: {
-      class: "text-blue-600 underline hover:text-blue-800",
+      class: 'text-blue-600 underline hover:text-blue-800',
     },
   }),
   TextAlign.configure({
-    types: ["paragraph"],
+    types: ['paragraph'],
   }),
 ]
 
@@ -75,7 +75,7 @@ export function parseMarkdown(markdown: string): JSONContent {
 export function markdownToRichContent(text: string): JSONContent {
   const trimmed = text.trim()
   if (!trimmed) {
-    return { type: "doc", content: [{ type: "paragraph", content: [] }] }
+    return { type: 'doc', content: [{ type: 'paragraph', content: [] }] }
   }
   return parseMarkdown(trimmed)
 }

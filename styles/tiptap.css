@@ -90,7 +90,6 @@
 }
 
 /* Read-only mode (for preview) */
-.ProseMirror[contenteditable="false"] {
+.ProseMirror[contenteditable='false'] {
   cursor: default;
 }
-

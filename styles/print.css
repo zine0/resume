@@ -1,6 +1,5 @@
 /* 打印专用样式 */
 @media print {
-
   /* 预览页面根容器：清除固定高度与溢出裁剪，允许内容跨页 */
   .pdf-preview-page-root {
     height: auto !important;
@@ -11,7 +10,7 @@
   .pdf-preview-page-root .h-screen,
   .pdf-preview-page-root .min-h-screen,
   .pdf-preview-page-root .flex-1,
-  .pdf-preview-page-root [style*="overflow: hidden"] {
+  .pdf-preview-page-root [style*='overflow: hidden'] {
     height: auto !important;
     overflow: visible !important;
   }
@@ -62,7 +61,7 @@
     line-height: 1.45;
     color: #000 !important;
     background: white !important;
-    font-family: "Microsoft YaHei", "SimSun", "Arial", sans-serif !important;
+    font-family: 'Microsoft YaHei', 'SimSun', 'Arial', sans-serif !important;
   }
 
   /* 分页策略：
@@ -225,40 +224,40 @@
   }
 
   /* 顶层段落（非列表内）增加段落间距与行高 */
-  .resume-content .ProseMirror>p {
+  .resume-content .ProseMirror > p {
     margin: 0 0 5pt 0 !important;
     line-height: 1.6 !important;
   }
 
   /* 顶层列表块：为列表整体增加段后间距，避免与下一段合并贴紧 */
-  .resume-content .ProseMirror>ul,
-  .resume-content .ProseMirror>ol {
+  .resume-content .ProseMirror > ul,
+  .resume-content .ProseMirror > ol {
     margin: 0 0 5pt 0 !important;
   }
 
   /* 当段落紧跟在列表后：补充段前距离，避免贴靠 */
-  .resume-content .ProseMirror>ol+p,
-  .resume-content .ProseMirror>ul+p {
+  .resume-content .ProseMirror > ol + p,
+  .resume-content .ProseMirror > ul + p {
     margin-top: 5pt !important;
   }
 
   /* 模块行：为实现格内垂直居中，去掉格内段后，由行间距统一控制 */
-  .resume-content .resume-module .grid>div .ProseMirror>p:last-child {
+  .resume-content .resume-module .grid > div .ProseMirror > p:last-child {
     margin-bottom: 0 !important;
   }
 
-  .resume-content .resume-module .grid>div .ProseMirror>ul:last-child,
-  .resume-content .resume-module .grid>div .ProseMirror>ol:last-child {
+  .resume-content .resume-module .grid > div .ProseMirror > ul:last-child,
+  .resume-content .resume-module .grid > div .ProseMirror > ol:last-child {
     margin-bottom: 0 !important;
   }
 
   /* 行间距统一设为 5pt，等同于顶层段落的段后 */
-  .resume-content .resume-module .grid+.grid {
+  .resume-content .resume-module .grid + .grid {
     margin-top: 5pt !important;
   }
 
   /* 打印：让单行内容在最小高度内垂直居中 */
-  .resume-content .resume-module .grid>div .ProseMirror {
+  .resume-content .resume-module .grid > div .ProseMirror {
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
@@ -312,7 +311,6 @@
 
 /* 确保打印时不出现容器滚动条，避免被印到 PDF 里 */
 @media print {
-
   html,
   body {
     height: auto !important;
@@ -335,42 +333,42 @@
   font-size: 11pt;
 }
 
-.resume-preview.resume-content .ProseMirror>p {
+.resume-preview.resume-content .ProseMirror > p {
   margin: 0 0 0.6em 0 !important;
   line-height: 1.6 !important;
 }
 
 /* 预览：顶层列表块的段后间距 */
-.resume-preview.resume-content .ProseMirror>ul,
-.resume-preview.resume-content .ProseMirror>ol {
+.resume-preview.resume-content .ProseMirror > ul,
+.resume-preview.resume-content .ProseMirror > ol {
   margin: 0 0 0.6em 0 !important;
 }
 
 /* 预览：当段落紧跟在列表后时，补充对称的段前距离 */
-.resume-preview.resume-content .ProseMirror>ol+p,
-.resume-preview.resume-content .ProseMirror>ul+p {
+.resume-preview.resume-content .ProseMirror > ol + p,
+.resume-preview.resume-content .ProseMirror > ul + p {
   margin-top: 0.6em !important;
 }
 
 /* 预览：单行网格行内让文本在 40px 的编辑器最小高度中垂直居中 */
-.resume-preview.resume-content .resume-module .grid>div .ProseMirror {
+.resume-preview.resume-content .resume-module .grid > div .ProseMirror {
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
-.resume-preview.resume-content .resume-module .grid>div .ProseMirror>p:last-child {
+.resume-preview.resume-content .resume-module .grid > div .ProseMirror > p:last-child {
   margin-bottom: 0 !important;
   /* 单行格内，为了垂直居中去掉内边距 */
 }
 
-.resume-preview.resume-content .resume-module .grid>div .ProseMirror>ul:last-child,
-.resume-preview.resume-content .resume-module .grid>div .ProseMirror>ol:last-child {
+.resume-preview.resume-content .resume-module .grid > div .ProseMirror > ul:last-child,
+.resume-preview.resume-content .resume-module .grid > div .ProseMirror > ol:last-child {
   margin-bottom: 0 !important;
   /* 列表亦不在格内留下段后 */
 }
 
-.resume-preview.resume-content .resume-module .grid+.grid {
+.resume-preview.resume-content .resume-module .grid + .grid {
   margin-top: 0.6em !important;
   /* 全部由行间距统一控制 */
 }
@@ -391,7 +389,7 @@
   font-size: 11pt;
   line-height: 1.55;
   color: #000;
-  font-family: "Microsoft YaHei", "SimSun", "Arial", sans-serif;
+  font-family: 'Microsoft YaHei', 'SimSun', 'Arial', sans-serif;
 }
 
 .pdf-preview-mode .resume-title {
@@ -476,35 +474,35 @@
 }
 
 /* 预览下：顶层段落与列表的间距/行高 */
-.pdf-preview-mode .resume-content .ProseMirror>p {
+.pdf-preview-mode .resume-content .ProseMirror > p {
   margin: 0 0 0.6em 0 !important;
   line-height: 1.6 !important;
 }
 
-.pdf-preview-mode .resume-content .ProseMirror>ul,
-.pdf-preview-mode .resume-content .ProseMirror>ol {
+.pdf-preview-mode .resume-content .ProseMirror > ul,
+.pdf-preview-mode .resume-content .ProseMirror > ol {
   margin: 0 0 0.6em 0 !important;
 }
 
 /* PDF 预览：在单行 40px 的最小高度中垂直居中 */
-.pdf-preview-mode .resume-content .resume-module .grid>div .ProseMirror {
+.pdf-preview-mode .resume-content .resume-module .grid > div .ProseMirror {
   display: flex;
   flex-direction: column;
   justify-content: center;
 }
 
 /* 模块行：段后减半，段前补半 */
-.pdf-preview-mode .resume-content .resume-module .grid>div .ProseMirror>p:last-child {
+.pdf-preview-mode .resume-content .resume-module .grid > div .ProseMirror > p:last-child {
   margin-bottom: 0 !important;
   /* PDF 预览下同理，去掉格内段后 */
 }
 
-.pdf-preview-mode .resume-content .resume-module .grid>div .ProseMirror>ul:last-child,
-.pdf-preview-mode .resume-content .resume-module .grid>div .ProseMirror>ol:last-child {
+.pdf-preview-mode .resume-content .resume-module .grid > div .ProseMirror > ul:last-child,
+.pdf-preview-mode .resume-content .resume-module .grid > div .ProseMirror > ol:last-child {
   margin-bottom: 0 !important;
 }
 
-.pdf-preview-mode .resume-content .resume-module .grid+.grid {
+.pdf-preview-mode .resume-content .resume-module .grid + .grid {
   margin-top: 0.6em !important;
   /* 与顶层段后一致 */
 }
@@ -517,12 +515,12 @@
 /* --- Safety fallback for preview spacing between paragraphs and lists --- */
 /* If a paragraph is immediately followed by a list, ensure a 0.6em gap even
    when the paragraph's bottom margin is overridden by other rules. */
-.resume-preview.resume-content .ProseMirror>p:has(+ ol),
-.resume-preview.resume-content .ProseMirror>p:has(+ ul) {
+.resume-preview.resume-content .ProseMirror > p:has(+ ol),
+.resume-preview.resume-content .ProseMirror > p:has(+ ul) {
   margin-bottom: 0 !important;
 }
 
-.resume-preview.resume-content .ProseMirror>p+ol,
-.resume-preview.resume-content .ProseMirror>p+ul {
+.resume-preview.resume-content .ProseMirror > p + ol,
+.resume-preview.resume-content .ProseMirror > p + ul {
   margin-top: 0.6em !important;
 }

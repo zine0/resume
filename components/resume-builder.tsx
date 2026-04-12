@@ -1,27 +1,26 @@
+import type React from 'react'
 
-import type React from "react"
+import { useState, useEffect, useCallback, memo, useRef } from 'react'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
+import { Badge } from '@/components/ui/badge'
+import { Icon } from '@iconify/react'
+import type { ResumeData, EditorState } from '@/types/resume'
+import type { AutoSaveStatus } from '@/hooks/use-auto-save'
+import { loadDefaultTemplate, loadExampleTemplate } from '@/lib/storage'
+import ResumePreview from './resume-preview'
+import PersonalInfoEditor from './personal-info-editor'
+import JobIntentionEditor from './job-intention-editor'
+import ModuleEditor from './module-editor'
+import ExportButton from './export-button'
+import { AISettingsDialog } from './ai-settings-dialog'
+import JDAnalysisSheet from './jd-analysis-sheet'
+import FullResumeOptimizationDialog from './full-resume-optimization-dialog'
+import { useIsMobile } from '@/hooks/use-mobile'
 
-import { useState, useEffect, useCallback, memo, useRef } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
-import { Badge } from "@/components/ui/badge"
-import { Icon } from "@iconify/react"
-import type { ResumeData, EditorState } from "@/types/resume"
-import type { AutoSaveStatus } from "@/hooks/use-auto-save"
-import { loadDefaultTemplate, loadExampleTemplate } from "@/lib/storage"
-import ResumePreview from "./resume-preview"
-import PersonalInfoEditor from "./personal-info-editor"
-import JobIntentionEditor from "./job-intention-editor"
-import ModuleEditor from "./module-editor"
-import ExportButton from "./export-button"
-import { AISettingsDialog } from "./ai-settings-dialog"
-import JDAnalysisSheet from "./jd-analysis-sheet"
-import FullResumeOptimizationDialog from "./full-resume-optimization-dialog"
-import { useIsMobile } from "@/hooks/use-mobile"
-
-type ViewMode = "both" | "edit-only" | "preview-only"
+type ViewMode = 'both' | 'edit-only' | 'preview-only'
 
 const ViewModeSelector = memo(
   ({
@@ -32,27 +31,24 @@ const ViewModeSelector = memo(
     onViewModeChange: (mode: ViewMode) => void
   }) => {
     const modes = [
-      { key: "both" as ViewMode, label: "编辑+预览", icon: "mdi:view-split-vertical" },
-      { key: "edit-only" as ViewMode, label: "仅编辑", icon: "mdi:pencil" },
-      { key: "preview-only" as ViewMode, label: "仅预览", icon: "mdi:eye" },
+      { key: 'both' as ViewMode, label: '编辑+预览', icon: 'mdi:view-split-vertical' },
+      { key: 'edit-only' as ViewMode, label: '仅编辑', icon: 'mdi:pencil' },
+      { key: 'preview-only' as ViewMode, label: '仅预览', icon: 'mdi:eye' },
     ]
 
     return (
-      <div className="relative inline-flex bg-muted rounded-lg p-1">
+      <div className="bg-muted relative inline-flex rounded-lg p-1">
         {modes.map((mode) => (
           <button
             key={mode.key}
             onClick={() => onViewModeChange(mode.key)}
-            className={`
-            relative px-3 py-1.5 text-sm font-medium rounded-md transition-all duration-200
-            flex items-center gap-2 min-w-[100px] justify-center
-            ${viewMode === mode.key
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-              }
-          `}
+            className={`relative flex min-w-[100px] items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
+              viewMode === mode.key
+                ? 'bg-background text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            } `}
           >
-            <Icon icon={mode.icon} className="w-4 h-4" />
+            <Icon icon={mode.icon} className="h-4 w-4" />
             <span className="hidden sm:inline">{mode.label}</span>
           </button>
         ))}
@@ -61,14 +57,14 @@ const ViewModeSelector = memo(
   },
 )
 
-ViewModeSelector.displayName = "ViewModeSelector"
+ViewModeSelector.displayName = 'ViewModeSelector'
 
 /**
  * 简历构建器主组件
  */
 export default function ResumeBuilder({
   initialData,
-  template = "default",
+  template = 'default',
   onChange,
   onSave,
   onBack,
@@ -78,7 +74,7 @@ export default function ResumeBuilder({
   autoSaveLastSaved,
 }: {
   initialData?: ResumeData
-  template?: "default" | "example"
+  template?: 'default' | 'example'
   onChange?: (data: ResumeData) => void
   onSave?: (data: ResumeData) => void | Promise<void>
   onBack?: () => void
@@ -99,14 +95,14 @@ export default function ResumeBuilder({
   const isMobile = useIsMobile()
   const userOverridden = useRef(false)
 
-  const [viewMode, setViewMode] = useState<ViewMode>("both")
+  const [viewMode, setViewMode] = useState<ViewMode>('both')
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false)
   const [jdAnalysisOpen, setJdAnalysisOpen] = useState(false)
   const [fullOptimizeOpen, setFullOptimizeOpen] = useState(false)
 
   useEffect(() => {
     if (userOverridden.current) return
-    setViewMode(isMobile ? "edit-only" : "both")
+    setViewMode(isMobile ? 'edit-only' : 'both')
   }, [isMobile])
 
   useEffect(() => {
@@ -120,7 +116,7 @@ export default function ResumeBuilder({
     }
 
     const loadTemplate = async () => {
-      const tpl = template === "example" ? await loadExampleTemplate() : await loadDefaultTemplate()
+      const tpl = template === 'example' ? await loadExampleTemplate() : await loadDefaultTemplate()
       if (!tpl) return
       setEditorState({
         resumeData: tpl,
@@ -160,8 +156,8 @@ export default function ResumeBuilder({
     return (
       <div className="resume-editor">
         <div className="editor-toolbar no-print">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Icon icon="mdi:loading" className="w-4 h-4 animate-spin" />
+          <div className="text-muted-foreground flex items-center gap-2 text-sm">
+            <Icon icon="mdi:loading" className="h-4 w-4 animate-spin" />
             正在加载简历模板...
           </div>
         </div>
@@ -175,7 +171,7 @@ export default function ResumeBuilder({
       <div className="editor-toolbar no-print">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Icon icon="mdi:file-document-edit" className="w-6 h-6 text-primary" />
+            <Icon icon="mdi:file-document-edit" className="text-primary h-6 w-6" />
             <h1 className="text-lg font-semibold">简历编辑器</h1>
           </div>
           <Badge variant="secondary" className="text-xs">
@@ -192,7 +188,7 @@ export default function ResumeBuilder({
               onClick={() => onBack?.()}
               className="gap-2 bg-transparent"
             >
-              <Icon icon="mdi:arrow-left" className="w-4 h-4" />
+              <Icon icon="mdi:arrow-left" className="h-4 w-4" />
               返回
             </Button>
           ) : null}
@@ -206,31 +202,31 @@ export default function ResumeBuilder({
             <Button
               size="sm"
               onClick={() => onSave?.(editorState.resumeData)}
-              className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+              className="gap-2 bg-green-600 text-white hover:bg-green-700"
             >
-              <Icon icon="mdi:content-save" className="w-4 h-4" />
+              <Icon icon="mdi:content-save" className="h-4 w-4" />
               保存
             </Button>
           ) : null}
 
           {/* 自动保存状态 */}
-          {autoSaveStatus && autoSaveStatus !== "idle" && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-              {autoSaveStatus === "saving" && (
+          {autoSaveStatus && autoSaveStatus !== 'idle' && (
+            <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+              {autoSaveStatus === 'saving' && (
                 <>
-                  <Icon icon="mdi:loading" className="w-3 h-3 animate-spin" />
+                  <Icon icon="mdi:loading" className="h-3 w-3 animate-spin" />
                   保存中...
                 </>
               )}
-              {autoSaveStatus === "saved" && (
+              {autoSaveStatus === 'saved' && (
                 <>
-                  <Icon icon="mdi:check-circle" className="w-3 h-3 text-green-500" />
-                  已保存{autoSaveLastSaved ? ` ${autoSaveLastSaved}` : ""}
+                  <Icon icon="mdi:check-circle" className="h-3 w-3 text-green-500" />
+                  已保存{autoSaveLastSaved ? ` ${autoSaveLastSaved}` : ''}
                 </>
               )}
-              {autoSaveStatus === "error" && (
+              {autoSaveStatus === 'error' && (
                 <>
-                  <Icon icon="mdi:alert-circle" className="w-3 h-3 text-destructive" />
+                  <Icon icon="mdi:alert-circle" className="text-destructive h-3 w-3" />
                   自动保存失败
                 </>
               )}
@@ -238,10 +234,7 @@ export default function ResumeBuilder({
           )}
 
           {/* 导出 */}
-          <ExportButton
-            resumeData={editorState.resumeData}
-            size="sm"
-          />
+          <ExportButton resumeData={editorState.resumeData} size="sm" />
 
           <Separator orientation="vertical" className="h-6" />
 
@@ -251,7 +244,7 @@ export default function ResumeBuilder({
             onClick={() => setAiSettingsOpen(true)}
             className="gap-2 bg-transparent"
           >
-            <Icon icon="mdi:cog-outline" className="w-4 h-4" />
+            <Icon icon="mdi:cog-outline" className="h-4 w-4" />
             AI 设置
           </Button>
           <Button
@@ -260,7 +253,7 @@ export default function ResumeBuilder({
             onClick={() => setFullOptimizeOpen(true)}
             className="gap-2 bg-transparent"
           >
-            <Icon icon="mdi:sparkles" className="w-4 h-4" />
+            <Icon icon="mdi:sparkles" className="h-4 w-4" />
             一键优化
           </Button>
           <Button
@@ -269,7 +262,7 @@ export default function ResumeBuilder({
             onClick={() => setJdAnalysisOpen(true)}
             className="gap-2 bg-transparent"
           >
-            <Icon icon="mdi:target" className="w-4 h-4" />
+            <Icon icon="mdi:target" className="h-4 w-4" />
             JD 匹配
           </Button>
         </div>
@@ -278,26 +271,41 @@ export default function ResumeBuilder({
       {/* 主要内容区域 */}
       <div className="editor-content">
         {/* 编辑面板 */}
-        {(viewMode === "both" || viewMode === "edit-only") && (
-          <div className={`editor-panel no-print ${viewMode === "edit-only" ? "w-full flex justify-center" : ""}`}>
-            <div className={viewMode === "edit-only" ? "w-[210mm] max-w-full h-full overflow-y-auto" : ""}>
-              <div className="p-6 space-y-6">
+        {(viewMode === 'both' || viewMode === 'edit-only') && (
+          <div
+            className={`editor-panel no-print ${viewMode === 'edit-only' ? 'flex w-full justify-center' : ''}`}
+          >
+            <div
+              className={
+                viewMode === 'edit-only' ? 'h-full w-[210mm] max-w-full overflow-y-auto' : ''
+              }
+            >
+              <div className="space-y-6 p-6">
                 {/* 简历标题编辑 */}
                 <Card className="p-4">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Icon icon="mdi:format-title" className="w-5 h-5 text-primary" />
+                        <Icon icon="mdi:format-title" className="text-primary h-5 w-5" />
                         <h2 className="font-medium">简历标题</h2>
                       </div>
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => updateResumeData({ centerTitle: !editorState.resumeData.centerTitle })}
+                        onClick={() =>
+                          updateResumeData({ centerTitle: !editorState.resumeData.centerTitle })
+                        }
                         className="gap-2 bg-transparent"
                       >
-                        <Icon icon={editorState.resumeData.centerTitle ? "mdi:format-align-center" : "mdi:format-align-left"} className="w-4 h-4" />
-                        {editorState.resumeData.centerTitle ? "居中显示" : "左对齐"}
+                        <Icon
+                          icon={
+                            editorState.resumeData.centerTitle
+                              ? 'mdi:format-align-center'
+                              : 'mdi:format-align-left'
+                          }
+                          className="h-4 w-4"
+                        />
+                        {editorState.resumeData.centerTitle ? '居中显示' : '左对齐'}
                       </Button>
                     </div>
                     <Input
@@ -337,9 +345,17 @@ export default function ResumeBuilder({
         )}
 
         {/* 预览面板 */}
-        {(viewMode === "both" || viewMode === "preview-only") && (
-          <div className={`preview-panel ${viewMode === "preview-only" ? "w-full flex justify-center p-6 md:p-8" : ""}`}>
-            <div className={viewMode === "preview-only" ? "w-[210mm] max-w-full min-h-full bg-white shadow-sm" : ""}>
+        {(viewMode === 'both' || viewMode === 'preview-only') && (
+          <div
+            className={`preview-panel ${viewMode === 'preview-only' ? 'flex w-full justify-center p-6 md:p-8' : ''}`}
+          >
+            <div
+              className={
+                viewMode === 'preview-only'
+                  ? 'min-h-full w-[210mm] max-w-full bg-white shadow-sm'
+                  : ''
+              }
+            >
               <ResumePreview resumeData={editorState.resumeData} />
             </div>
           </div>

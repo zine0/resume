@@ -35,34 +35,36 @@ export function ColorPickerProvider({ children }: { children: React.ReactNode })
   return (
     <ColorPickerContext.Provider value={{ openColorPicker }}>
       {children}
-      {isClient && isOpen && createPortal(
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) {
-              close()
-            }
-          }}
-        >
-          <div className="absolute inset-0 bg-black/50" />
+      {isClient &&
+        isOpen &&
+        createPortal(
           <div
-            className="relative z-10"
-            role="dialog"
-            aria-modal="true"
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <ColorPicker
-              initialColor={initialColor}
-              onSave={(color) => {
-                onSaveCallback?.(color)
+            className="fixed inset-0 z-50 flex items-center justify-center"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) {
                 close()
-              }}
-              onCancel={close}
-            />
-          </div>
-        </div>,
-        document.body
-      )}
+              }
+            }}
+          >
+            <div className="absolute inset-0 bg-black/50" />
+            <div
+              className="relative z-10"
+              role="dialog"
+              aria-modal="true"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <ColorPicker
+                initialColor={initialColor}
+                onSave={(color) => {
+                  onSaveCallback?.(color)
+                  close()
+                }}
+                onCancel={close}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
     </ColorPickerContext.Provider>
   )
 }

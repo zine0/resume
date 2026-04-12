@@ -1,7 +1,6 @@
-
-import { useState } from "react"
-import { Icon } from "@iconify/react"
-import { Button } from "@/components/ui/button"
+import { useState } from 'react'
+import { Icon } from '@iconify/react'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -9,10 +8,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { useToast } from "@/hooks/use-toast"
-import { aiOptimizeResume, applyAiPatchToResumeData } from "@/lib/ai-service"
-import type { ResumeData } from "@/types/resume"
+} from '@/components/ui/dialog'
+import { useToast } from '@/hooks/use-toast'
+import { aiOptimizeResume, applyAiPatchToResumeData } from '@/lib/ai-service'
+import type { ResumeData } from '@/types/resume'
 
 interface FullResumeOptimizationDialogProps {
   open: boolean
@@ -32,7 +31,7 @@ export default function FullResumeOptimizationDialog({
 
   const handleOptimize = async () => {
     if (!onCreateOptimizedResume) {
-      toast({ title: "当前页面不支持生成副本", variant: "destructive" })
+      toast({ title: '当前页面不支持生成副本', variant: 'destructive' })
       return
     }
 
@@ -42,15 +41,16 @@ export default function FullResumeOptimizationDialog({
       const { data } = applyAiPatchToResumeData(resumeData, patch)
       await onCreateOptimizedResume(data)
       toast({
-        title: patch.warnings.length > 0 ? "已生成优化副本（含保留项）" : "已生成优化副本",
-        description: patch.warnings.length > 0
-          ? patch.warnings.slice(0, 2).join(" ")
-          : "优化后的简历已另存为新副本，当前简历未被覆盖。",
+        title: patch.warnings.length > 0 ? '已生成优化副本（含保留项）' : '已生成优化副本',
+        description:
+          patch.warnings.length > 0
+            ? patch.warnings.slice(0, 2).join(' ')
+            : '优化后的简历已另存为新副本，当前简历未被覆盖。',
       })
       onOpenChange(false)
     } catch (err) {
-      const message = err instanceof Error ? err.message : "生成优化副本失败"
-      toast({ title: "生成失败", description: message, variant: "destructive" })
+      const message = err instanceof Error ? err.message : '生成优化副本失败'
+      toast({ title: '生成失败', description: message, variant: 'destructive' })
     } finally {
       setOptimizing(false)
     }
@@ -66,22 +66,22 @@ export default function FullResumeOptimizationDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="rounded-lg border bg-muted/30 p-4">
-          <div className="space-y-3 text-sm text-muted-foreground">
+        <div className="bg-muted/30 rounded-lg border p-4">
+          <div className="text-muted-foreground space-y-3 text-sm">
             <div className="flex items-start gap-2">
-              <Icon icon="mdi:auto-fix" className="mt-0.5 h-4 w-4 text-primary" />
+              <Icon icon="mdi:auto-fix" className="text-primary mt-0.5 h-4 w-4" />
               <span>整体优化标题、求职意向、模块内容和标签表达。</span>
             </div>
             <div className="flex items-start gap-2">
-              <Icon icon="mdi:file-plus-outline" className="mt-0.5 h-4 w-4 text-primary" />
+              <Icon icon="mdi:file-plus-outline" className="text-primary mt-0.5 h-4 w-4" />
               <span>优化结果会另存为新简历副本，方便你对比和继续修改。</span>
             </div>
             <div className="flex items-start gap-2">
-              <Icon icon="mdi:content-save-alert-outline" className="mt-0.5 h-4 w-4 text-primary" />
+              <Icon icon="mdi:content-save-alert-outline" className="text-primary mt-0.5 h-4 w-4" />
               <span>会直接读取当前编辑器里的内容；即使你还没点“保存”，这些修改也会参与优化。</span>
             </div>
             <div className="flex items-start gap-2">
-              <Icon icon="mdi:shield-check-outline" className="mt-0.5 h-4 w-4 text-primary" />
+              <Icon icon="mdi:shield-check-outline" className="text-primary mt-0.5 h-4 w-4" />
               <span>联系方式、链接和复杂富文本会优先保留原样，避免误改事实信息或破坏格式。</span>
             </div>
           </div>

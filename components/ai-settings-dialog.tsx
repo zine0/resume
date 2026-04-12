@@ -1,5 +1,4 @@
-
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -7,23 +6,23 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select"
-import { Icon } from "@iconify/react"
-import type { AIConfig } from "@/types/ai"
-import { AI_PRESETS } from "@/types/ai"
-import { getAIConfig, saveAIConfig } from "@/lib/ai-config"
-import { aiTestConnection } from "@/lib/ai-service"
-import { useToast } from "@/hooks/use-toast"
+} from '@/components/ui/select'
+import { Icon } from '@iconify/react'
+import type { AIConfig } from '@/types/ai'
+import { AI_PRESETS } from '@/types/ai'
+import { getAIConfig, saveAIConfig } from '@/lib/ai-config'
+import { aiTestConnection } from '@/lib/ai-service'
+import { useToast } from '@/hooks/use-toast'
 
 interface AISettingsDialogProps {
   open: boolean
@@ -32,17 +31,17 @@ interface AISettingsDialogProps {
 
 export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) {
   const { toast } = useToast()
-  const [provider, setProvider] = useState("openai")
-  const [apiKey, setApiKey] = useState("")
-  const [model, setModel] = useState("")
-  const [baseUrl, setBaseUrl] = useState("")
+  const [provider, setProvider] = useState('openai')
+  const [apiKey, setApiKey] = useState('')
+  const [model, setModel] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const resetForm = useCallback(() => {
-    setProvider("openai")
-    setApiKey("")
+    setProvider('openai')
+    setApiKey('')
     setModel(AI_PRESETS.openai.models[0])
     setBaseUrl(AI_PRESETS.openai.baseUrl)
     setShowApiKey(false)
@@ -67,32 +66,32 @@ export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) 
     const preset = AI_PRESETS[value]
     if (preset) {
       setBaseUrl(preset.baseUrl)
-      setModel(preset.models[0] ?? "")
+      setModel(preset.models[0] ?? '')
     }
   }
 
   const handleSave = async () => {
     if (!apiKey.trim()) {
       toast({
-        title: "保存失败",
-        description: "请填写 API Key",
-        variant: "destructive",
+        title: '保存失败',
+        description: '请填写 API Key',
+        variant: 'destructive',
       })
       return
     }
     if (!model.trim()) {
       toast({
-        title: "保存失败",
-        description: "请填写模型名称",
-        variant: "destructive",
+        title: '保存失败',
+        description: '请填写模型名称',
+        variant: 'destructive',
       })
       return
     }
     if (!baseUrl.trim()) {
       toast({
-        title: "保存失败",
-        description: "请填写 API 地址",
-        variant: "destructive",
+        title: '保存失败',
+        description: '请填写 API 地址',
+        variant: 'destructive',
       })
       return
     }
@@ -107,13 +106,13 @@ export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) 
     setSaving(true)
     try {
       await saveAIConfig(config)
-      toast({ title: "AI 设置已保存" })
+      toast({ title: 'AI 设置已保存' })
       onOpenChange(false)
     } catch {
       toast({
-        title: "保存失败",
-        description: "无法保存配置，请重试",
-        variant: "destructive",
+        title: '保存失败',
+        description: '无法保存配置，请重试',
+        variant: 'destructive',
       })
     } finally {
       setSaving(false)
@@ -123,9 +122,9 @@ export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) 
   const handleTestConnection = async () => {
     if (!apiKey.trim() || !model.trim() || !baseUrl.trim()) {
       toast({
-        title: "测试失败",
-        description: "请先填写完整的配置信息",
-        variant: "destructive",
+        title: '测试失败',
+        description: '请先填写完整的配置信息',
+        variant: 'destructive',
       })
       return
     }
@@ -139,13 +138,13 @@ export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) 
         model: model.trim(),
       })
       await aiTestConnection()
-      toast({ title: "连接成功", description: "AI 服务已就绪" })
+      toast({ title: '连接成功', description: 'AI 服务已就绪' })
     } catch (err) {
-      const message = err instanceof Error ? err.message : "未知错误"
+      const message = err instanceof Error ? err.message : '未知错误'
       toast({
-        title: "连接失败",
+        title: '连接失败',
         description: message,
-        variant: "destructive",
+        variant: 'destructive',
       })
     } finally {
       setTesting(false)
@@ -153,7 +152,7 @@ export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) 
   }
 
   const currentPreset = AI_PRESETS[provider]
-  const isCustom = provider === "custom"
+  const isCustom = provider === 'custom'
   const presetModels = currentPreset?.models ?? []
 
   return (
@@ -161,9 +160,7 @@ export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) 
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>AI 设置</DialogTitle>
-          <DialogDescription>
-            配置 AI 服务提供商和模型参数
-          </DialogDescription>
+          <DialogDescription>配置 AI 服务提供商和模型参数</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
@@ -188,7 +185,7 @@ export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) 
             <div className="relative">
               <Input
                 id="ai-api-key"
-                type={showApiKey ? "text" : "password"}
+                type={showApiKey ? 'text' : 'password'}
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="sk-..."
@@ -203,8 +200,8 @@ export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) 
                 tabIndex={-1}
               >
                 <Icon
-                  icon={showApiKey ? "lucide:eye-off" : "lucide:eye"}
-                  className="size-4 text-muted-foreground"
+                  icon={showApiKey ? 'lucide:eye-off' : 'lucide:eye'}
+                  className="text-muted-foreground size-4"
                 />
               </Button>
             </div>
@@ -243,30 +240,22 @@ export function AISettingsDialog({ open, onOpenChange }: AISettingsDialogProps) 
               onChange={(e) => setBaseUrl(e.target.value)}
               placeholder="https://api.openai.com/v1"
               readOnly={!isCustom}
-              className={!isCustom ? "bg-muted cursor-not-allowed" : ""}
+              className={!isCustom ? 'bg-muted cursor-not-allowed' : ''}
             />
           </div>
         </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            variant="outline"
-            onClick={handleTestConnection}
-            disabled={testing || saving}
-          >
-            {testing && (
-              <Icon icon="lucide:loader-2" className="size-4 animate-spin" />
-            )}
-            {testing ? "测试中..." : "测试连接"}
+          <Button variant="outline" onClick={handleTestConnection} disabled={testing || saving}>
+            {testing && <Icon icon="lucide:loader-2" className="size-4 animate-spin" />}
+            {testing ? '测试中...' : '测试连接'}
           </Button>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             取消
           </Button>
           <Button onClick={handleSave} disabled={testing || saving}>
-            {saving && (
-              <Icon icon="lucide:loader-2" className="size-4 animate-spin" />
-            )}
-            {saving ? "保存中..." : "保存"}
+            {saving && <Icon icon="lucide:loader-2" className="size-4 animate-spin" />}
+            {saving ? '保存中...' : '保存'}
           </Button>
         </DialogFooter>
       </DialogContent>

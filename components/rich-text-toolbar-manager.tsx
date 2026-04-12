@@ -60,25 +60,31 @@ export function ToolbarProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  const registerEditor = useCallback((editor: Editor) => {
-    const handleSelectionUpdate = () => {
-      updateToolbarPosition(editor)
-    }
+  const registerEditor = useCallback(
+    (editor: Editor) => {
+      const handleSelectionUpdate = () => {
+        updateToolbarPosition(editor)
+      }
 
-    editor.on('selectionUpdate', handleSelectionUpdate)
+      editor.on('selectionUpdate', handleSelectionUpdate)
 
-    // Return cleanup function
-    return () => {
-      editor.off('selectionUpdate', handleSelectionUpdate)
-    }
-  }, [updateToolbarPosition])
+      // Return cleanup function
+      return () => {
+        editor.off('selectionUpdate', handleSelectionUpdate)
+      }
+    },
+    [updateToolbarPosition],
+  )
 
-  const unregisterEditor = useCallback((editor: Editor) => {
-    if (editor === activeEditor) {
-      setShowToolbar(false)
-      setActiveEditor(null)
-    }
-  }, [activeEditor])
+  const unregisterEditor = useCallback(
+    (editor: Editor) => {
+      if (editor === activeEditor) {
+        setShowToolbar(false)
+        setActiveEditor(null)
+      }
+    },
+    [activeEditor],
+  )
 
   // Update position on scroll
   useEffect(() => {
@@ -122,18 +128,21 @@ export function ToolbarProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToolbarContext.Provider value={{ registerEditor, unregisterEditor }}>
       {children}
-      {isClient && showToolbar && activeEditor && createPortal(
-        <div
-          className="fixed z-50 rich-text-toolbar overflow-visible"
-          style={{
-            top: `${toolbarPosition.top}px`,
-            left: `${toolbarPosition.left}px`,
-          }}
-        >
-          <RichTextToolbar editor={activeEditor} />
-        </div>,
-        document.body
-      )}
+      {isClient &&
+        showToolbar &&
+        activeEditor &&
+        createPortal(
+          <div
+            className="rich-text-toolbar fixed z-50 overflow-visible"
+            style={{
+              top: `${toolbarPosition.top}px`,
+              left: `${toolbarPosition.left}px`,
+            }}
+          >
+            <RichTextToolbar editor={activeEditor} />
+          </div>,
+          document.body,
+        )}
     </ToolbarContext.Provider>
   )
 }

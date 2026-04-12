@@ -38,13 +38,13 @@ React UI ←→ lib/storage.ts ←→ Tauri invoke() ←→ Rust commands ←→
 
 Defined in `src/App.tsx`:
 
-| Route | Purpose | Key Component |
-|---|---|---|
-| `/` | Resume list / user center | `src/routes/Home.tsx` |
-| `/edit/new` | Create a new resume, optionally from clone/example/prefetched data | `src/routes/EditNew.tsx` |
-| `/edit/:id` | Edit an existing resume | `src/routes/EditResume.tsx` |
-| `/view/:id` | Read-only preview | `src/routes/ViewResume.tsx` |
-| `/print` | Print-friendly rendering surface | `src/routes/Print.tsx` |
+| Route       | Purpose                                                            | Key Component               |
+| ----------- | ------------------------------------------------------------------ | --------------------------- |
+| `/`         | Resume list / user center                                          | `src/routes/Home.tsx`       |
+| `/edit/new` | Create a new resume, optionally from clone/example/prefetched data | `src/routes/EditNew.tsx`    |
+| `/edit/:id` | Edit an existing resume                                            | `src/routes/EditResume.tsx` |
+| `/view/:id` | Read-only preview                                                  | `src/routes/ViewResume.tsx` |
+| `/print`    | Print-friendly rendering surface                                   | `src/routes/Print.tsx`      |
 
 ### Tauri Backend Surface
 
@@ -86,10 +86,10 @@ Registered in `src-tauri/src/lib.rs`:
 Always use the `@/` alias for project-local imports:
 
 ```tsx
-import { Button } from "@/components/ui/button"
-import type { ResumeData } from "@/types/resume"
-import { getAllResumes } from "@/lib/storage"
-import { useToast } from "@/hooks/use-toast"
+import { Button } from '@/components/ui/button'
+import type { ResumeData } from '@/types/resume'
+import { getAllResumes } from '@/lib/storage'
+import { useToast } from '@/hooks/use-toast'
 ```
 
 ### Components
@@ -125,14 +125,14 @@ import { useToast } from "@/hooks/use-toast"
 
 ### Naming Patterns
 
-| Category | Convention | Example |
-|---|---|---|
-| Components | PascalCase | `ResumeBuilder` |
-| Files | kebab-case | `resume-builder.tsx` |
-| Hooks | camelCase with `use` prefix | `useToast` |
-| Utilities | camelCase | `generatePdfFilename` |
-| Types/Interfaces | PascalCase | `ResumeData`, `StoredResume` |
-| CSS classes | kebab-case | `.resume-preview`, `.editor-toolbar` |
+| Category         | Convention                  | Example                              |
+| ---------------- | --------------------------- | ------------------------------------ |
+| Components       | PascalCase                  | `ResumeBuilder`                      |
+| Files            | kebab-case                  | `resume-builder.tsx`                 |
+| Hooks            | camelCase with `use` prefix | `useToast`                           |
+| Utilities        | camelCase                   | `generatePdfFilename`                |
+| Types/Interfaces | PascalCase                  | `ResumeData`, `StoredResume`         |
+| CSS classes      | kebab-case                  | `.resume-preview`, `.editor-toolbar` |
 
 ## Key Files to Read First
 

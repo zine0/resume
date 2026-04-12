@@ -1,5 +1,4 @@
-
-import { invoke } from "@tauri-apps/api/core"
+import { invoke } from '@tauri-apps/api/core'
 import type {
   JobIntentionItem,
   JobIntentionSection,
@@ -8,20 +7,16 @@ import type {
   ResumeData,
   ResumeModule,
   StoredResume,
-} from "@/types/resume"
+} from '@/types/resume'
 
-export type StorageErrorCode =
-  | "UNAVAILABLE"
-  | "PARSE_ERROR"
-  | "QUOTA_EXCEEDED"
-  | "UNKNOWN"
+export type StorageErrorCode = 'UNAVAILABLE' | 'PARSE_ERROR' | 'QUOTA_EXCEEDED' | 'UNKNOWN'
 
 export class StorageError extends Error {
   code: StorageErrorCode
-  constructor(message: string, code: StorageErrorCode = "UNKNOWN") {
+  constructor(message: string, code: StorageErrorCode = 'UNKNOWN') {
     super(message)
     this.code = code
-    this.name = "StorageError"
+    this.name = 'StorageError'
   }
 }
 
@@ -34,18 +29,18 @@ interface ResumeValidationResult {
 function mapTauriError(e: unknown): StorageError {
   if (e instanceof StorageError) return e
   const msg = e instanceof Error ? e.message : String(e)
-  if (msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("no space left")) {
-    return new StorageError("存储容量已满", "QUOTA_EXCEEDED")
+  if (msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('no space left')) {
+    return new StorageError('存储容量已满', 'QUOTA_EXCEEDED')
   }
-  if (msg.toLowerCase().includes("unavailable") || msg.toLowerCase().includes("not available")) {
-    return new StorageError("Tauri 后端不可用", "UNAVAILABLE")
+  if (msg.toLowerCase().includes('unavailable') || msg.toLowerCase().includes('not available')) {
+    return new StorageError('Tauri 后端不可用', 'UNAVAILABLE')
   }
-  return new StorageError(msg, "UNKNOWN")
+  return new StorageError(msg, 'UNKNOWN')
 }
 
 export async function getAllResumes(): Promise<StoredResume[]> {
   try {
-    return await invoke<StoredResume[]>("get_all_resumes")
+    return await invoke<StoredResume[]>('get_all_resumes')
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -53,7 +48,7 @@ export async function getAllResumes(): Promise<StoredResume[]> {
 
 export async function getResumeById(id: string): Promise<StoredResume | null> {
   try {
-    return await invoke<StoredResume | null>("get_resume_by_id", { id })
+    return await invoke<StoredResume | null>('get_resume_by_id', { id })
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -61,11 +56,11 @@ export async function getResumeById(id: string): Promise<StoredResume | null> {
 
 export async function upsertResume(entry: StoredResume): Promise<StoredResume> {
   try {
-    const existing = await invoke<StoredResume | null>("get_resume_by_id", { id: entry.id })
+    const existing = await invoke<StoredResume | null>('get_resume_by_id', { id: entry.id })
     if (existing) {
-      return await invoke<StoredResume>("update_resume", { id: entry.id, data: entry.resumeData })
+      return await invoke<StoredResume>('update_resume', { id: entry.id, data: entry.resumeData })
     }
-    return await invoke<StoredResume>("create_resume", { entry })
+    return await invoke<StoredResume>('create_resume', { entry })
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -73,15 +68,17 @@ export async function upsertResume(entry: StoredResume): Promise<StoredResume> {
 
 export async function getDefaultResumeData(): Promise<ResumeData> {
   try {
-    return await invoke<ResumeData>("get_default_resume_data")
+    return await invoke<ResumeData>('get_default_resume_data')
   } catch (e) {
     throw mapTauriError(e)
   }
 }
 
-export async function validateResumeDataWithBackend(data: ResumeData): Promise<ResumeValidationResult> {
+export async function validateResumeDataWithBackend(
+  data: ResumeData,
+): Promise<ResumeValidationResult> {
   try {
-    return await invoke<ResumeValidationResult>("validate_resume_data_command", { data })
+    return await invoke<ResumeValidationResult>('validate_resume_data_command', { data })
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -89,7 +86,7 @@ export async function validateResumeDataWithBackend(data: ResumeData): Promise<R
 
 export async function importResumeFile(content: string): Promise<ResumeData> {
   try {
-    return await invoke<ResumeData>("import_resume_file", { content })
+    return await invoke<ResumeData>('import_resume_file', { content })
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -97,7 +94,7 @@ export async function importResumeFile(content: string): Promise<ResumeData> {
 
 export async function exportResumeFile(data: ResumeData): Promise<string> {
   try {
-    return await invoke<string>("export_resume_file", { data })
+    return await invoke<string>('export_resume_file', { data })
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -105,18 +102,18 @@ export async function exportResumeFile(data: ResumeData): Promise<string> {
 
 export async function createPersonalInfoItem(order = 0): Promise<PersonalInfoItem> {
   try {
-    return await invoke<PersonalInfoItem>("create_personal_info_item", { order })
+    return await invoke<PersonalInfoItem>('create_personal_info_item', { order })
   } catch (e) {
     throw mapTauriError(e)
   }
 }
 
 export async function createJobIntentionItem(
-  type: JobIntentionSection["items"][number]["type"],
+  type: JobIntentionSection['items'][number]['type'],
   order: number,
 ): Promise<JobIntentionItem> {
   try {
-    return await invoke<JobIntentionItem>("create_job_intention_item", { itemType: type, order })
+    return await invoke<JobIntentionItem>('create_job_intention_item', { itemType: type, order })
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -124,15 +121,18 @@ export async function createJobIntentionItem(
 
 export async function createResumeModule(order: number): Promise<ResumeModule> {
   try {
-    return await invoke<ResumeModule>("create_resume_module", { order })
+    return await invoke<ResumeModule>('create_resume_module', { order })
   } catch (e) {
     throw mapTauriError(e)
   }
 }
 
-export async function createRichTextRow(columns: 1 | 2 | 3 | 4, order: number): Promise<ModuleContentRow> {
+export async function createRichTextRow(
+  columns: 1 | 2 | 3 | 4,
+  order: number,
+): Promise<ModuleContentRow> {
   try {
-    return await invoke<ModuleContentRow>("create_rich_text_row", { columns, order })
+    return await invoke<ModuleContentRow>('create_rich_text_row', { columns, order })
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -140,7 +140,7 @@ export async function createRichTextRow(columns: 1 | 2 | 3 | 4, order: number): 
 
 export async function createTagsRow(order: number): Promise<ModuleContentRow> {
   try {
-    return await invoke<ModuleContentRow>("create_tags_row", { order })
+    return await invoke<ModuleContentRow>('create_tags_row', { order })
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -148,7 +148,7 @@ export async function createTagsRow(order: number): Promise<ModuleContentRow> {
 
 export async function deleteResumes(ids: string[]): Promise<void> {
   try {
-    await invoke<void>("delete_resumes", { ids })
+    await invoke<void>('delete_resumes', { ids })
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -156,7 +156,7 @@ export async function deleteResumes(ids: string[]): Promise<void> {
 
 export async function createEntryFromData(data: ResumeData): Promise<StoredResume> {
   try {
-    return await invoke<StoredResume>("create_resume_from_data", { data })
+    return await invoke<StoredResume>('create_resume_from_data', { data })
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -166,10 +166,10 @@ export async function updateEntryData(id: string, data: ResumeData): Promise<Sto
   try {
     const validation = await validateResumeDataWithBackend(data)
     if (!validation.isValid) {
-      throw new StorageError(`简历数据校验失败：${validation.errors.join("；")}`)
+      throw new StorageError(`简历数据校验失败：${validation.errors.join('；')}`)
     }
 
-    return await invoke<StoredResume>("update_resume", { id, data: validation.normalizedData })
+    return await invoke<StoredResume>('update_resume', { id, data: validation.normalizedData })
   } catch (e) {
     if (e instanceof StorageError) throw e
     throw mapTauriError(e)
@@ -183,17 +183,17 @@ async function loadTemplateFrom(path: string): Promise<ResumeData | null> {
     const content = await res.text()
     return await importResumeFile(content)
   } catch {
-    console.warn("Failed to load template from:", path)
+    console.warn('Failed to load template from:', path)
     return null
   }
 }
 
 export async function loadDefaultTemplate(): Promise<ResumeData> {
-  const template = await loadTemplateFrom("/template.json")
+  const template = await loadTemplateFrom('/template.json')
   if (template) return template
   return getDefaultResumeData()
 }
 
 export function loadExampleTemplate(): Promise<ResumeData | null> {
-  return loadTemplateFrom("/example.json")
+  return loadTemplateFrom('/example.json')
 }
