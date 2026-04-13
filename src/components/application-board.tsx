@@ -1,12 +1,33 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  type MutableRefObject,
+  type ReactNode,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefCallback,
+} from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '@iconify/react'
-import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd'
+import {
+  closestCorners,
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import {
   AlertDialog,
@@ -112,6 +133,28 @@ function formatDateLabel(value: string) {
   })
 }
 
+function isApplicationStatus(value: string): value is ApplicationStatus {
+  return STATUS_ORDER.includes(value as ApplicationStatus)
+}
+
+function noopRef() {}
+
+interface RenderApplicationCardArgs {
+  application: ApplicationEntry
+  linkedResumeTitle?: string
+  tailoring: boolean
+  isDragging: boolean
+  fixedWidth?: number
+  style?: CSSProperties
+  setRef: RefCallback<HTMLDivElement>
+  dragHandle?: ReactNode
+  previewOnly?: boolean
+  movingId: string | null
+  onEdit: (application: ApplicationEntry) => void
+  onDelete: (application: ApplicationEntry) => void
+  onTailor: (application: ApplicationEntry) => Promise<void>
+}
+
 export default function ApplicationBoard() {
   const navigate = useNavigate()
   const { toast } = useToast()
@@ -128,7 +171,16 @@ export default function ApplicationBoard() {
   const [deleteTarget, setDeleteTarget] = useState<ApplicationEntry | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [tailoringIds, setTailoringIds] = useState<string[]>([])
+  const [activeApplicationId, setActiveApplicationId] = useState<string | null>(null)
   const tailoringIdsRef = useRef(new Set<string>())
+  const cardWidthsRef = useRef(new Map<string, number>())
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+  )
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -288,14 +340,20 @@ export default function ApplicationBoard() {
     }
   }
 
-  const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination) return
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setActiveApplicationId(String(active.id))
+  }
 
-    const nextStatus = result.destination.droppableId as ApplicationStatus
-    const previousStatus = result.source.droppableId as ApplicationStatus
+  const handleDragEnd = async ({ active, over }: DragEndEvent) => {
+    setActiveApplicationId(null)
+    if (!over) return
+
+    const nextStatus = String(over.id)
+    const previousStatus = String(active.data.current?.status ?? '')
+    if (!isApplicationStatus(nextStatus) || !isApplicationStatus(previousStatus)) return
     if (nextStatus === previousStatus) return
 
-    const target = applications.find((application) => application.id === result.draggableId)
+    const target = applications.find((application) => application.id === String(active.id))
     if (!target) return
 
     const previousApplications = applications
@@ -327,6 +385,10 @@ export default function ApplicationBoard() {
     } finally {
       setMovingId(null)
     }
+  }
+
+  const handleDragCancel = () => {
+    setActiveApplicationId(null)
   }
 
   const handleDelete = async () => {
@@ -372,9 +434,7 @@ export default function ApplicationBoard() {
       return
     }
 
-    if (tailoringIdsRef.current.has(application.id)) {
-      return
-    }
+    if (tailoringIdsRef.current.has(application.id)) return
 
     tailoringIdsRef.current.add(application.id)
     setTailoringIds((prev) => [...prev, application.id])
@@ -432,6 +492,144 @@ export default function ApplicationBoard() {
       setTailoringIds((prev) => prev.filter((id) => id !== application.id))
     }
   }
+
+  const renderApplicationCard = ({
+    application,
+    linkedResumeTitle,
+    tailoring,
+    isDragging,
+    fixedWidth,
+    style,
+    setRef,
+    dragHandle,
+    previewOnly = false,
+    movingId: currentMovingId,
+    onEdit,
+    onDelete,
+    onTailor,
+  }: RenderApplicationCardArgs) => (
+    <div
+      ref={setRef}
+      style={{
+        ...style,
+        ...(fixedWidth ? { width: fixedWidth } : {}),
+        ...(isDragging ? { zIndex: 1100 } : {}),
+      }}
+      className={cn('whitespace-normal transition-transform', isDragging && 'rotate-[1deg]')}
+    >
+      <Card
+        className={cn(
+          'gap-3 p-4',
+          currentMovingId === application.id && 'opacity-70',
+          isDragging && 'shadow-2xl',
+          previewOnly && 'pointer-events-none',
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2">
+            {dragHandle ? <div className="shrink-0">{dragHandle}</div> : null}
+            <div className="space-y-1">
+              <p className="text-base leading-tight font-semibold">{application.company}</p>
+              <p className="text-muted-foreground text-sm">{application.role}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            {application.url ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8"
+                onClick={() => window.open(application.url, '_blank', 'noopener,noreferrer')}
+                disabled={previewOnly}
+              >
+                <Icon icon="mdi:open-in-new" className="h-4 w-4" />
+              </Button>
+            ) : null}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={() => onEdit(application)}
+              disabled={previewOnly}
+            >
+              <Icon icon="mdi:pencil-outline" className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:bg-destructive size-8 hover:text-white"
+              onClick={() => onDelete(application)}
+              disabled={previewOnly}
+            >
+              <Icon icon="mdi:trash-can-outline" className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {linkedResumeTitle ? (
+            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
+              简历 · {linkedResumeTitle}
+            </Badge>
+          ) : null}
+          {application.appliedAt ? (
+            <Badge variant="outline">投递于 {application.appliedAt}</Badge>
+          ) : null}
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full gap-2 bg-transparent"
+          disabled={tailoring || previewOnly}
+          onClick={() => void onTailor(application)}
+        >
+          {tailoring ? (
+            <>
+              <Icon icon="lucide:loader-2" className="h-4 w-4 animate-spin" />
+              定制中...
+            </>
+          ) : (
+            <>
+              <Icon icon="mdi:sparkles" className="h-4 w-4" />
+              JD 定制简历
+            </>
+          )}
+        </Button>
+
+        {application.jdText ? (
+          <div className="bg-muted/40 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
+            <p className="line-clamp-4">JD：{application.jdText}</p>
+          </div>
+        ) : null}
+
+        {application.notes ? (
+          <div className="bg-muted/40 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
+            <p className="line-clamp-4">备注：{application.notes}</p>
+          </div>
+        ) : null}
+
+        <div className="text-muted-foreground flex items-center justify-between text-xs">
+          <span>最近更新</span>
+          <span>{formatDateLabel(application.updatedAt)}</span>
+        </div>
+      </Card>
+    </div>
+  )
+
+  const activeApplication = useMemo(
+    () => applications.find((application) => application.id === activeApplicationId) ?? null,
+    [activeApplicationId, applications],
+  )
+
+  const activeLinkedResumeTitle = activeApplication
+    ? activeApplication.resumeTitle ||
+      (activeApplication.resumeId ? resumeTitleMap.get(activeApplication.resumeId) : undefined)
+    : undefined
+
+  const activeApplicationWidth = activeApplicationId
+    ? cardWidthsRef.current.get(activeApplicationId)
+    : undefined
 
   if (loading) {
     return (
@@ -573,214 +771,65 @@ export default function ApplicationBoard() {
             </div>
           </Card>
         ) : (
-          <ScrollArea className="w-full whitespace-nowrap">
-            <DragDropContext onDragEnd={(result) => void handleDragEnd(result)}>
-              <div className="flex min-w-max gap-4 pb-4">
-                {STATUS_ORDER.map((status) => {
-                  const meta = STATUS_META[status]
-                  const items = groupedApplications[status]
-
-                  return (
-                    <Card key={status} className="w-[320px] shrink-0 gap-4 py-4">
-                      <div className="flex items-center justify-between px-4">
-                        <div className="flex items-center gap-2">
-                          <div className={cn('rounded-lg border p-2', meta.surfaceClass)}>
-                            <Icon icon={meta.icon} className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <h2 className="text-sm font-semibold">{meta.label}</h2>
-                            <p className="text-muted-foreground text-xs">拖拽卡片即可变更状态</p>
-                          </div>
-                        </div>
-                        <Badge variant="outline" className={meta.badgeClass}>
-                          {items.length}
-                        </Badge>
-                      </div>
-
-                      <Droppable droppableId={status}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className={cn(
-                              'relative mx-3 min-h-[380px] rounded-xl border border-dashed p-3 transition-colors',
-                              meta.surfaceClass,
-                              snapshot.isDraggingOver && 'ring-ring/30 ring-2',
-                            )}
-                          >
-                            {items.length === 0 ? (
-                              <div className="text-muted-foreground pointer-events-none absolute inset-x-4 top-1/2 z-10 -translate-y-1/2 text-center text-sm leading-relaxed whitespace-normal">
-                                {meta.emptyCopy}
-                              </div>
-                            ) : null}
-
-                            <div className="space-y-3">
-                              {items.map((application, index) => {
-                                const tailoring = tailoringIds.includes(application.id)
-                                const linkedResumeTitle =
-                                  application.resumeTitle ||
-                                  (application.resumeId
-                                    ? resumeTitleMap.get(application.resumeId)
-                                    : undefined)
-
-                                return (
-                                  <Draggable
-                                    key={application.id}
-                                    draggableId={application.id}
-                                    index={index}
-                                  >
-                                    {(draggableProvided, draggableSnapshot) => (
-                                      <div
-                                        ref={draggableProvided.innerRef}
-                                        {...draggableProvided.draggableProps}
-                                        {...draggableProvided.dragHandleProps}
-                                        style={draggableProvided.draggableProps.style}
-                                        className={cn(
-                                          'whitespace-normal transition-transform',
-                                          draggableSnapshot.isDragging && 'rotate-[1deg]',
-                                        )}
-                                      >
-                                        <Card
-                                          className={cn(
-                                            'gap-3 p-4',
-                                            movingId === application.id && 'opacity-70',
-                                          )}
-                                        >
-                                          <div className="flex items-start justify-between gap-3">
-                                            <div className="space-y-1">
-                                              <p className="text-base leading-tight font-semibold">
-                                                {application.company}
-                                              </p>
-                                              <p className="text-muted-foreground text-sm">
-                                                {application.role}
-                                              </p>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                              {application.url ? (
-                                                <Button
-                                                  variant="ghost"
-                                                  size="icon"
-                                                  className="size-8"
-                                                  onClick={() =>
-                                                    window.open(
-                                                      application.url,
-                                                      '_blank',
-                                                      'noopener,noreferrer',
-                                                    )
-                                                  }
-                                                >
-                                                  <Icon
-                                                    icon="mdi:open-in-new"
-                                                    className="h-4 w-4"
-                                                  />
-                                                </Button>
-                                              ) : null}
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="size-8"
-                                                onClick={() => {
-                                                  setEditingItem(application)
-                                                  setDialogOpen(true)
-                                                }}
-                                              >
-                                                <Icon
-                                                  icon="mdi:pencil-outline"
-                                                  className="h-4 w-4"
-                                                />
-                                              </Button>
-                                              <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-muted-foreground hover:bg-destructive size-8 hover:text-white"
-                                                onClick={() => setDeleteTarget(application)}
-                                              >
-                                                <Icon
-                                                  icon="mdi:trash-can-outline"
-                                                  className="h-4 w-4"
-                                                />
-                                              </Button>
-                                            </div>
-                                          </div>
-
-                                          <div className="flex flex-wrap gap-2">
-                                            {linkedResumeTitle ? (
-                                              <Badge
-                                                variant="outline"
-                                                className="bg-primary/5 text-primary border-primary/20"
-                                              >
-                                                简历 · {linkedResumeTitle}
-                                              </Badge>
-                                            ) : null}
-                                            {application.appliedAt ? (
-                                              <Badge variant="outline">
-                                                投递于 {application.appliedAt}
-                                              </Badge>
-                                            ) : null}
-                                          </div>
-
-                                          <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="w-full gap-2 bg-transparent"
-                                            disabled={tailoring}
-                                            onClick={() =>
-                                              void handleCreateTailoredResume(application)
-                                            }
-                                          >
-                                            {tailoring ? (
-                                              <>
-                                                <Icon
-                                                  icon="lucide:loader-2"
-                                                  className="h-4 w-4 animate-spin"
-                                                />
-                                                定制中...
-                                              </>
-                                            ) : (
-                                              <>
-                                                <Icon icon="mdi:sparkles" className="h-4 w-4" />
-                                                JD 定制简历
-                                              </>
-                                            )}
-                                          </Button>
-
-                                          {application.jdText ? (
-                                            <div className="bg-muted/40 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
-                                              <p className="line-clamp-4">
-                                                JD：{application.jdText}
-                                              </p>
-                                            </div>
-                                          ) : null}
-
-                                          {application.notes ? (
-                                            <div className="bg-muted/40 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
-                                              <p className="line-clamp-4">
-                                                备注：{application.notes}
-                                              </p>
-                                            </div>
-                                          ) : null}
-
-                                          <div className="text-muted-foreground flex items-center justify-between text-xs">
-                                            <span>最近更新</span>
-                                            <span>{formatDateLabel(application.updatedAt)}</span>
-                                          </div>
-                                        </Card>
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                )
-                              })}
-                              {provided.placeholder}
-                            </div>
-                          </div>
-                        )}
-                      </Droppable>
-                    </Card>
-                  )
-                })}
+          <div className="w-full overflow-visible">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragStart={handleDragStart}
+              onDragEnd={(event) => void handleDragEnd(event)}
+              onDragCancel={handleDragCancel}
+            >
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] items-start gap-4 pb-4">
+                {STATUS_ORDER.map((status) => (
+                  <BoardColumn
+                    key={status}
+                    status={status}
+                    meta={STATUS_META[status]}
+                    items={groupedApplications[status]}
+                    movingId={movingId}
+                    resumeTitleMap={resumeTitleMap}
+                    tailoringIds={tailoringIds}
+                    cardWidthsRef={cardWidthsRef}
+                    renderApplicationCard={renderApplicationCard}
+                    onEdit={(application) => {
+                      setEditingItem(application)
+                      setDialogOpen(true)
+                    }}
+                    onDelete={setDeleteTarget}
+                    onTailor={handleCreateTailoredResume}
+                  />
+                ))}
               </div>
-            </DragDropContext>
-          </ScrollArea>
+
+              <DragOverlay>
+                {activeApplication
+                  ? renderApplicationCard({
+                      application: activeApplication,
+                      linkedResumeTitle: activeLinkedResumeTitle,
+                      tailoring: tailoringIds.includes(activeApplication.id),
+                      isDragging: true,
+                      fixedWidth: activeApplicationWidth,
+                      setRef: noopRef,
+                      previewOnly: true,
+                      movingId,
+                      onEdit: () => {},
+                      onDelete: () => {},
+                      onTailor: async () => {},
+                      dragHandle: (
+                        <button
+                          type="button"
+                          className="text-muted-foreground inline-flex size-8 items-center justify-center rounded-md"
+                          aria-hidden="true"
+                          tabIndex={-1}
+                        >
+                          <Icon icon="mdi:drag" className="h-4 w-4" />
+                        </button>
+                      ),
+                    })
+                  : null}
+              </DragOverlay>
+            </DndContext>
+          </div>
         )}
       </div>
 
@@ -823,4 +872,165 @@ export default function ApplicationBoard() {
       </AlertDialog>
     </div>
   )
+}
+
+interface BoardColumnProps {
+  status: ApplicationStatus
+  meta: StatusMeta
+  items: ApplicationEntry[]
+  movingId: string | null
+  resumeTitleMap: Map<string, string>
+  tailoringIds: string[]
+  cardWidthsRef: MutableRefObject<Map<string, number>>
+  renderApplicationCard: (args: RenderApplicationCardArgs) => ReactNode
+  onEdit: (application: ApplicationEntry) => void
+  onDelete: (application: ApplicationEntry) => void
+  onTailor: (application: ApplicationEntry) => Promise<void>
+}
+
+function BoardColumn({
+  status,
+  meta,
+  items,
+  movingId,
+  resumeTitleMap,
+  tailoringIds,
+  cardWidthsRef,
+  renderApplicationCard,
+  onEdit,
+  onDelete,
+  onTailor,
+}: BoardColumnProps) {
+  const { isOver, setNodeRef } = useDroppable({
+    id: status,
+    data: { status },
+  })
+
+  return (
+    <Card className="h-full w-full min-w-0 gap-4 py-4">
+      <div className="flex items-center justify-between px-4">
+        <div className="flex items-center gap-2">
+          <div className={cn('rounded-lg border p-2', meta.surfaceClass)}>
+            <Icon icon={meta.icon} className="h-4 w-4" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold">{meta.label}</h2>
+            <p className="text-muted-foreground text-xs">拖拽手柄即可变更状态</p>
+          </div>
+        </div>
+        <Badge variant="outline" className={meta.badgeClass}>
+          {items.length}
+        </Badge>
+      </div>
+
+      <div
+        ref={setNodeRef}
+        className={cn(
+          'relative mx-3 min-h-[380px] rounded-xl border border-dashed p-3 transition-colors',
+          meta.surfaceClass,
+          isOver && 'ring-ring/30 ring-2',
+        )}
+      >
+        {items.length === 0 ? (
+          <div className="text-muted-foreground pointer-events-none absolute inset-x-4 top-1/2 z-10 -translate-y-1/2 text-center text-sm leading-relaxed whitespace-normal">
+            {meta.emptyCopy}
+          </div>
+        ) : null}
+
+        <div className="space-y-3">
+          {items.map((application) => {
+            const tailoring = tailoringIds.includes(application.id)
+            const linkedResumeTitle =
+              application.resumeTitle ||
+              (application.resumeId ? resumeTitleMap.get(application.resumeId) : undefined)
+
+            return (
+              <BoardDraggableCard
+                key={application.id}
+                application={application}
+                linkedResumeTitle={linkedResumeTitle}
+                tailoring={tailoring}
+                movingId={movingId}
+                cardWidthsRef={cardWidthsRef}
+                renderApplicationCard={renderApplicationCard}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onTailor={onTailor}
+              />
+            )
+          })}
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+interface BoardDraggableCardProps {
+  application: ApplicationEntry
+  linkedResumeTitle?: string
+  tailoring: boolean
+  movingId: string | null
+  cardWidthsRef: MutableRefObject<Map<string, number>>
+  renderApplicationCard: (args: RenderApplicationCardArgs) => ReactNode
+  onEdit: (application: ApplicationEntry) => void
+  onDelete: (application: ApplicationEntry) => void
+  onTailor: (application: ApplicationEntry) => Promise<void>
+}
+
+function BoardDraggableCard({
+  application,
+  linkedResumeTitle,
+  tailoring,
+  movingId,
+  cardWidthsRef,
+  renderApplicationCard,
+  onEdit,
+  onDelete,
+  onTailor,
+}: BoardDraggableCardProps) {
+  const { attributes, isDragging, listeners, setNodeRef, transform } = useDraggable({
+    id: application.id,
+    data: {
+      status: application.status,
+    },
+  })
+
+  const setMeasuredRef: RefCallback<HTMLDivElement> = (node) => {
+    setNodeRef(node)
+    if (node) {
+      cardWidthsRef.current.set(application.id, node.getBoundingClientRect().width)
+    } else {
+      cardWidthsRef.current.delete(application.id)
+    }
+  }
+
+  return renderApplicationCard({
+    application,
+    linkedResumeTitle,
+    tailoring,
+    isDragging,
+    style: {
+      opacity: isDragging ? 0.12 : undefined,
+      transform: CSS.Translate.toString(transform),
+    },
+    setRef: setMeasuredRef,
+    movingId,
+    onEdit,
+    onDelete,
+    onTailor,
+    dragHandle: (
+      <button
+        type="button"
+        className={cn(
+          'text-muted-foreground hover:bg-muted inline-flex size-8 cursor-grab items-center justify-center rounded-md transition-colors active:cursor-grabbing',
+          isDragging && 'cursor-grabbing',
+        )}
+        aria-label="拖拽调整状态"
+        {...listeners}
+        {...attributes}
+      >
+        <Icon icon="mdi:drag" className="h-4 w-4" />
+      </button>
+    ),
+  })
 }
