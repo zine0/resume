@@ -238,12 +238,8 @@ export default function UserCenter() {
           <Badge variant="secondary">{items.length}</Badge>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            className="gap-2 bg-transparent"
-            onClick={() => navigate('/board')}
-          >
-            <Icon icon="mdi:view-kanban-outline" className="h-4 w-4" /> 求职看板
+          <Button variant="outline" className="gap-2 bg-transparent" onClick={() => navigate('/')}>
+            <Icon icon="mdi:view-kanban-outline" className="h-4 w-4" /> 回到求职看板
           </Button>
           {items.length > 0 && (
             <>
@@ -320,7 +316,7 @@ export default function UserCenter() {
                   <Button
                     variant="outline"
                     className="shrink-0 gap-2"
-                    onClick={() => navigate('/board')}
+                    onClick={() => navigate('/')}
                   >
                     <Icon icon="mdi:view-kanban-outline" className="h-4 w-4" /> 求职看板
                   </Button>

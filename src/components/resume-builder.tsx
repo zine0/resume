@@ -15,7 +15,6 @@ import PersonalInfoEditor from './personal-info-editor'
 import JobIntentionEditor from './job-intention-editor'
 import ModuleEditor from './module-editor'
 import ExportButton from './export-button'
-import { AISettingsDialog } from './ai-settings-dialog'
 import JDAnalysisSheet from './jd-analysis-sheet'
 import FullResumeOptimizationDialog from './full-resume-optimization-dialog'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -96,7 +95,6 @@ export default function ResumeBuilder({
   const userOverridden = useRef(false)
 
   const [viewMode, setViewMode] = useState<ViewMode>('both')
-  const [aiSettingsOpen, setAiSettingsOpen] = useState(false)
   const [jdAnalysisOpen, setJdAnalysisOpen] = useState(false)
   const [fullOptimizeOpen, setFullOptimizeOpen] = useState(false)
 
@@ -251,15 +249,6 @@ export default function ResumeBuilder({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setAiSettingsOpen(true)}
-            className="gap-2 bg-transparent"
-          >
-            <Icon icon="mdi:cog-outline" className="h-4 w-4" />
-            AI 设置
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
             onClick={() => setFullOptimizeOpen(true)}
             className="gap-2 bg-transparent"
           >
@@ -372,7 +361,6 @@ export default function ResumeBuilder({
         )}
       </div>
 
-      <AISettingsDialog open={aiSettingsOpen} onOpenChange={setAiSettingsOpen} />
       <FullResumeOptimizationDialog
         open={fullOptimizeOpen}
         onOpenChange={setFullOptimizeOpen}

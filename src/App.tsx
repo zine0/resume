@@ -4,6 +4,7 @@ import { ColorPickerProvider } from '@/components/color-picker-manager'
 import { ToolbarProvider } from '@/components/rich-text-toolbar-manager'
 import { Toaster } from '@/components/toaster'
 import Home from './routes/Home'
+import Resumes from './routes/Resumes'
 import EditNew from './routes/EditNew'
 import EditResume from './routes/EditResume'
 import ViewResume from './routes/ViewResume'
@@ -20,6 +21,7 @@ export default function App() {
             <ToolbarProvider>
               <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/resumes" element={<Resumes />} />
                 <Route path="/edit/new" element={<EditNew />} />
                 <Route path="/edit/:id" element={<EditResume />} />
                 <Route path="/view/:id" element={<ViewResume />} />

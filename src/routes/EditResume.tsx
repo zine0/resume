@@ -61,7 +61,11 @@ export default function EditResume() {
     return (
       <main className="bg-background min-h-screen p-6">
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2 bg-transparent" onClick={() => navigate('/')}>
+          <Button
+            variant="outline"
+            className="gap-2 bg-transparent"
+            onClick={() => navigate('/resumes')}
+          >
             <Icon icon="mdi:arrow-left" className="h-4 w-4" /> 返回
           </Button>
           <span className="text-destructive text-sm">未找到该简历</span>
@@ -75,7 +79,7 @@ export default function EditResume() {
       <ResumeBuilder
         initialData={entry.resumeData}
         onChange={setCurrentData}
-        onBack={() => navigate('/')}
+        onBack={() => navigate('/resumes')}
         onSave={() => handleSave()}
         onCreateTailoredResume={(data) => handleCreateResumeCopy(data)}
         onCreateOptimizedResume={(data) => handleCreateResumeCopy(data)}

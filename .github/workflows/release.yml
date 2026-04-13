@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 concurrency:
   group: release-${{ github.ref }}
@@ -21,10 +21,10 @@ jobs:
         include:
           - name: Windows
             os: windows-latest
-            args: ''
+            args: ""
           - name: Linux
             os: ubuntu-22.04
-            args: ''
+            args: ""
           - name: macOS Apple Silicon
             os: macos-latest
             args: --target aarch64-apple-darwin
@@ -78,8 +78,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: v__VERSION__
-          releaseName: 'resume v__VERSION__'
-          releaseBody: 'See the assets below to download and install this version.'
-          releaseDraft: false
+          releaseName: "resume v__VERSION__"
+          releaseBody: "See the assets below to download and install this version."
+          releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

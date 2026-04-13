@@ -73,7 +73,7 @@ function EditNewContent() {
       <ResumeBuilder
         initialData={clonedData ?? prefetchedData}
         template={useExample ? 'example' : 'default'}
-        onBack={() => navigate('/')}
+        onBack={() => navigate('/resumes')}
         onSave={(d) => handleSave(d)}
         onCreateTailoredResume={(d) => handleCreateResumeCopy(d)}
         onCreateOptimizedResume={(d) => handleCreateResumeCopy(d)}

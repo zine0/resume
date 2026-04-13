@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '@iconify/react'
 import { DragDropContext, Draggable, Droppable, type DropResult } from '@hello-pangea/dnd'
@@ -18,13 +18,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { AISettingsDialog } from '@/components/ai-settings-dialog'
 import { useToast } from '@/hooks/use-toast'
 import JobApplicationDialog from '@/components/job-application-dialog'
+import { aiAnalyzeJD, applyAiPatchToResumeData, JD_SUGGESTION_MODULE_TITLE } from '@/lib/ai-service'
 import {
+  createEntryFromData,
   createApplication,
   deleteApplications,
   getAllApplications,
   getAllResumes,
+  getResumeById,
   updateApplication,
 } from '@/lib/storage'
 import { cn } from '@/lib/utils'
@@ -115,28 +119,51 @@ export default function ApplicationBoard() {
   const [resumes, setResumes] = useState<StoredResume[]>([])
   const [keyword, setKeyword] = useState('')
   const [loading, setLoading] = useState(true)
+  const [resumeLoadFailed, setResumeLoadFailed] = useState(false)
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<ApplicationEntry | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [movingId, setMovingId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ApplicationEntry | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [tailoringIds, setTailoringIds] = useState<string[]>([])
+  const tailoringIdsRef = useRef(new Set<string>())
 
   const refresh = useCallback(async () => {
     setLoading(true)
+    setResumeLoadFailed(false)
     try {
-      const [nextApplications, nextResumes] = await Promise.all([
+      const [nextApplications, nextResumes] = await Promise.allSettled([
         getAllApplications(),
         getAllResumes(),
       ])
-      setApplications(nextApplications)
-      setResumes(nextResumes)
-    } catch (error) {
-      toast({
-        title: '读取看板失败',
-        description: error instanceof Error ? error.message : '无法读取求职看板数据',
-        variant: 'destructive',
-      })
+
+      if (nextApplications.status === 'fulfilled') {
+        setApplications(nextApplications.value)
+      } else {
+        setApplications([])
+        toast({
+          title: '读取看板失败',
+          description:
+            nextApplications.reason instanceof Error
+              ? nextApplications.reason.message
+              : '无法读取求职看板数据',
+          variant: 'destructive',
+        })
+      }
+
+      if (nextResumes.status === 'fulfilled') {
+        setResumes(nextResumes.value)
+      } else {
+        setResumes([])
+        setResumeLoadFailed(true)
+        toast({
+          title: '简历库暂时不可用',
+          description: '仍可继续管理求职记录，稍后可前往简历库重试。',
+          variant: 'destructive',
+        })
+      }
     } finally {
       setLoading(false)
     }
@@ -325,6 +352,87 @@ export default function ApplicationBoard() {
     }
   }
 
+  const handleCreateTailoredResume = async (application: ApplicationEntry) => {
+    if (!application.resumeId) {
+      toast({
+        title: '请先关联简历',
+        description: '当前记录还没有绑定简历，无法直接生成 JD 定制副本。',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    const jdText = application.jdText?.trim()
+    if (!jdText) {
+      toast({
+        title: '请先补充 JD',
+        description: '当前记录还没有填写职位描述，无法进行 JD 定制。',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (tailoringIdsRef.current.has(application.id)) {
+      return
+    }
+
+    tailoringIdsRef.current.add(application.id)
+    setTailoringIds((prev) => [...prev, application.id])
+
+    let createdResumeTitle: string | null = null
+
+    try {
+      const resume = await getResumeById(application.resumeId)
+      if (!resume) {
+        toast({
+          title: '关联简历不存在',
+          description: '当前绑定的简历无法加载，请重新关联后再试。',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      const analysisResult = await aiAnalyzeJD(resume.resumeData, jdText)
+      const { data, appliedCount, unmatchedCount } = applyAiPatchToResumeData(
+        resume.resumeData,
+        analysisResult.patch,
+        { fallbackModuleTitle: JD_SUGGESTION_MODULE_TITLE },
+      )
+
+      const newEntry = await createEntryFromData(data)
+      createdResumeTitle = newEntry.resumeData.title || '未命名简历'
+
+      const updated = await updateApplication(application.id, {
+        ...toInput(application),
+        resumeId: newEntry.id,
+        resumeTitle: createdResumeTitle,
+      })
+
+      setResumes((prev) => [newEntry, ...prev.filter((item) => item.id !== newEntry.id)])
+      setApplications((prev) => prev.map((item) => (item.id === updated.id ? updated : item)))
+
+      toast({
+        title: '已生成 JD 定制简历',
+        description:
+          unmatchedCount > 0
+            ? `已创建「${createdResumeTitle}」，应用 ${appliedCount} 条建议，其余 ${unmatchedCount} 条已加入“${JD_SUGGESTION_MODULE_TITLE}”。`
+            : `已创建「${createdResumeTitle}」，并自动绑定到当前岗位。`,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '无法生成 JD 定制简历'
+      toast({
+        title: 'JD 定制失败',
+        description: createdResumeTitle
+          ? `${message} 已生成的副本「${createdResumeTitle}」仍保留在简历库中。`
+          : message,
+        variant: 'destructive',
+      })
+    } finally {
+      tailoringIdsRef.current.delete(application.id)
+      setTailoringIds((prev) => prev.filter((id) => id !== application.id))
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center px-6">
@@ -346,11 +454,11 @@ export default function ApplicationBoard() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate('/resumes')}
                   className="gap-2 bg-transparent"
                 >
-                  <Icon icon="mdi:arrow-left" className="h-4 w-4" />
-                  返回用户中心
+                  <Icon icon="mdi:file-document-multiple-outline" className="h-4 w-4" />
+                  简历库
                 </Button>
                 <Separator orientation="vertical" className="hidden h-6 md:block" />
                 <div className="flex items-center gap-2">
@@ -360,8 +468,13 @@ export default function ApplicationBoard() {
                 </div>
               </div>
               <p className="text-muted-foreground text-sm">
-                把感兴趣的岗位、已投递进度和面试结果放在同一块看板里，节奏更清晰。
+                把岗位、投递进度和结果放在同一块看板里统一推进，需要时再进入简历库管理版本。
               </p>
+              {resumeLoadFailed ? (
+                <p className="text-destructive text-sm">
+                  简历库加载失败，当前仍可继续管理求职记录。
+                </p>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -371,6 +484,14 @@ export default function ApplicationBoard() {
                 placeholder="搜索公司、岗位、JD 或备注..."
                 className="w-full sm:w-72"
               />
+              <Button
+                variant="outline"
+                onClick={() => setAiSettingsOpen(true)}
+                className="gap-2 bg-transparent"
+              >
+                <Icon icon="mdi:cog-outline" className="h-4 w-4" />
+                AI 设置
+              </Button>
               <Button
                 onClick={() => {
                   setEditingItem(null)
@@ -423,11 +544,11 @@ export default function ApplicationBoard() {
               </Button>
               <Button
                 variant="outline"
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/resumes')}
                 className="gap-2 bg-transparent"
               >
                 <Icon icon="mdi:file-document-outline" className="h-4 w-4" />
-                回到简历列表
+                前往简历库
               </Button>
             </div>
           </Card>
@@ -495,6 +616,7 @@ export default function ApplicationBoard() {
 
                             <div className="space-y-3">
                               {items.map((application, index) => {
+                                const tailoring = tailoringIds.includes(application.id)
                                 const linkedResumeTitle =
                                   application.resumeTitle ||
                                   (application.resumeId
@@ -597,6 +719,31 @@ export default function ApplicationBoard() {
                                             ) : null}
                                           </div>
 
+                                          <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="w-full gap-2 bg-transparent"
+                                            disabled={tailoring}
+                                            onClick={() =>
+                                              void handleCreateTailoredResume(application)
+                                            }
+                                          >
+                                            {tailoring ? (
+                                              <>
+                                                <Icon
+                                                  icon="lucide:loader-2"
+                                                  className="h-4 w-4 animate-spin"
+                                                />
+                                                定制中...
+                                              </>
+                                            ) : (
+                                              <>
+                                                <Icon icon="mdi:sparkles" className="h-4 w-4" />
+                                                JD 定制简历
+                                              </>
+                                            )}
+                                          </Button>
+
                                           {application.jdText ? (
                                             <div className="bg-muted/40 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
                                               <p className="line-clamp-4">
@@ -648,6 +795,8 @@ export default function ApplicationBoard() {
         initialValue={editingItem ? toInput(editingItem) : null}
         resumeOptions={resumeOptions}
       />
+
+      <AISettingsDialog open={aiSettingsOpen} onOpenChange={setAiSettingsOpen} />
 
       <AlertDialog
         open={Boolean(deleteTarget)}

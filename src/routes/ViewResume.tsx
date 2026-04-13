@@ -32,7 +32,11 @@ export default function ViewResume() {
     return (
       <main className="bg-background min-h-screen p-6">
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2 bg-transparent" onClick={() => navigate('/')}>
+          <Button
+            variant="outline"
+            className="gap-2 bg-transparent"
+            onClick={() => navigate('/resumes')}
+          >
             <Icon icon="mdi:arrow-left" className="h-4 w-4" /> 返回
           </Button>
           <span className="text-destructive text-sm">未找到该简历</span>
@@ -45,7 +49,11 @@ export default function ViewResume() {
     <main className="bg-background min-h-screen">
       <div className="flex items-center justify-between p-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" className="gap-2 bg-transparent" onClick={() => navigate('/')}>
+          <Button
+            variant="outline"
+            className="gap-2 bg-transparent"
+            onClick={() => navigate('/resumes')}
+          >
             <Icon icon="mdi:arrow-left" className="h-4 w-4" /> 返回
           </Button>
           <span className="text-muted-foreground text-sm">预览：{entry.resumeData.title}</span>
