@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { ApplicationEntry, ApplicationInput } from '@/types/application'
 import type {
+  CreateResumeLineageInput,
   JobIntentionItem,
   JobIntentionSection,
   ModuleContentRow,
@@ -155,9 +156,12 @@ export async function deleteResumes(ids: string[]): Promise<void> {
   }
 }
 
-export async function createEntryFromData(data: ResumeData): Promise<StoredResume> {
+export async function createEntryFromData(
+  data: ResumeData,
+  lineage?: CreateResumeLineageInput,
+): Promise<StoredResume> {
   try {
-    return await invoke<StoredResume>('create_resume_from_data', { data })
+    return await invoke<StoredResume>('create_resume_from_data', { data, lineage })
   } catch (e) {
     throw mapTauriError(e)
   }

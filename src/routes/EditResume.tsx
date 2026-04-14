@@ -48,9 +48,17 @@ export default function EditResume() {
     }
   }
 
-  const handleCreateResumeCopy = async (data: ResumeData) => {
-    const entry = await createEntryFromData(data)
-    navigate(`/edit/${entry.id}`)
+  const handleCreateResumeCopy = async (
+    data: ResumeData,
+    variantKind: StoredResume['lineage']['variantKind'],
+  ) => {
+    if (!entry) return
+    const createdEntry = await createEntryFromData(data, {
+      familyId: entry.lineage.familyId,
+      parentResumeId: entry.id,
+      variantKind,
+    })
+    navigate(`/edit/${createdEntry.id}`)
   }
 
   if (loading) {
@@ -81,8 +89,8 @@ export default function EditResume() {
         onChange={setCurrentData}
         onBack={() => navigate('/resumes')}
         onSave={() => handleSave()}
-        onCreateTailoredResume={(data) => handleCreateResumeCopy(data)}
-        onCreateOptimizedResume={(data) => handleCreateResumeCopy(data)}
+        onCreateTailoredResume={(data) => handleCreateResumeCopy(data, 'jdTailored')}
+        onCreateOptimizedResume={(data) => handleCreateResumeCopy(data, 'optimized')}
         autoSaveStatus={autoSaveStatus}
         autoSaveLastSaved={lastSavedText}
       />

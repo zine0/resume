@@ -37,6 +37,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import ExportButton from '@/components/export-button'
+import { getResumeLineageHint, getResumeVariantLabel } from '@/lib/resume-lineage'
 
 type SortKey = 'name' | 'createdAt' | 'updatedAt'
 type SortDir = 'asc' | 'desc'
@@ -397,7 +398,21 @@ export default function UserCenter() {
                       />
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium">{it.resumeData.title || '未命名'}</TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{it.resumeData.title || '未命名'}</span>
+                        <Badge variant="outline">
+                          {getResumeVariantLabel(it.lineage.variantKind)}
+                        </Badge>
+                      </div>
+                      {getResumeLineageHint(it.lineage) ? (
+                        <p className="text-muted-foreground text-xs">
+                          {getResumeLineageHint(it.lineage)}
+                        </p>
+                      ) : null}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-center text-xs">
                     {new Date(it.createdAt).toLocaleString()}
                   </TableCell>

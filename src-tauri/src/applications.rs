@@ -32,6 +32,14 @@ pub struct ApplicationEntry {
     pub url: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub applied_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_action: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub follow_up_date: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interview_stage: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interview_round: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -54,6 +62,14 @@ pub struct ApplicationInput {
     pub url: Option<String>,
     #[serde(default)]
     pub applied_at: Option<String>,
+    #[serde(default)]
+    pub next_action: Option<String>,
+    #[serde(default)]
+    pub follow_up_date: Option<String>,
+    #[serde(default)]
+    pub interview_stage: Option<String>,
+    #[serde(default)]
+    pub interview_round: Option<String>,
     #[serde(default)]
     pub notes: Option<String>,
 }
@@ -112,6 +128,13 @@ fn validate_application_input(input: ApplicationInput) -> Result<ApplicationInpu
         return Err("职位名称不能为空".to_string());
     }
 
+    let interview_stage = sanitize_optional_text(input.interview_stage);
+    let interview_round = sanitize_optional_text(input.interview_round);
+    let (interview_stage, interview_round) = match input.status {
+        ApplicationStatus::Interview => (interview_stage, interview_round),
+        _ => (None, None),
+    };
+
     Ok(ApplicationInput {
         status: input.status,
         company,
@@ -121,6 +144,10 @@ fn validate_application_input(input: ApplicationInput) -> Result<ApplicationInpu
         resume_title: sanitize_optional_text(input.resume_title),
         url: sanitize_optional_text(input.url),
         applied_at: sanitize_optional_text(input.applied_at),
+        next_action: sanitize_optional_text(input.next_action),
+        follow_up_date: sanitize_optional_text(input.follow_up_date),
+        interview_stage,
+        interview_round,
         notes: sanitize_optional_text(input.notes),
     })
 }
@@ -141,6 +168,10 @@ fn build_entry(
         resume_title: input.resume_title,
         url: input.url,
         applied_at: input.applied_at,
+        next_action: input.next_action,
+        follow_up_date: input.follow_up_date,
+        interview_stage: input.interview_stage,
+        interview_round: input.interview_round,
         created_at,
         updated_at,
         notes: input.notes,
@@ -216,7 +247,7 @@ mod tests {
 
     fn valid_input() -> ApplicationInput {
         ApplicationInput {
-            status: ApplicationStatus::Wishlist,
+            status: ApplicationStatus::Interview,
             company: "  Acme  ".to_string(),
             role: "  Rust Engineer  ".to_string(),
             jd_text: Some("  build desktop apps  ".to_string()),
@@ -224,6 +255,10 @@ mod tests {
             resume_title: Some(" Resume A ".to_string()),
             url: Some(" https://example.com ".to_string()),
             applied_at: Some(" 2026-04-12 ".to_string()),
+            next_action: Some(" send follow-up email ".to_string()),
+            follow_up_date: Some(" 2026-04-18 ".to_string()),
+            interview_stage: Some(" 技术面 ".to_string()),
+            interview_round: Some(" 第 2 轮 ".to_string()),
             notes: Some("  keep in touch  ".to_string()),
         }
     }
@@ -235,6 +270,13 @@ mod tests {
         assert_eq!(validated.role, "Rust Engineer");
         assert_eq!(validated.jd_text.as_deref(), Some("build desktop apps"));
         assert_eq!(validated.resume_id.as_deref(), Some("resume-1"));
+        assert_eq!(
+            validated.next_action.as_deref(),
+            Some("send follow-up email")
+        );
+        assert_eq!(validated.follow_up_date.as_deref(), Some("2026-04-18"));
+        assert_eq!(validated.interview_stage.as_deref(), Some("技术面"));
+        assert_eq!(validated.interview_round.as_deref(), Some("第 2 轮"));
     }
 
     #[test]
@@ -257,9 +299,26 @@ mod tests {
     fn validate_application_input_drops_empty_optional_values() {
         let mut input = valid_input();
         input.notes = Some("   ".to_string());
+        input.next_action = Some("  ".to_string());
+        input.follow_up_date = Some(" ".to_string());
+        input.interview_stage = Some("  ".to_string());
+        input.interview_round = Some(" ".to_string());
         input.url = None;
         let validated = validate_application_input(input).expect("input should validate");
         assert!(validated.notes.is_none());
+        assert!(validated.next_action.is_none());
+        assert!(validated.follow_up_date.is_none());
+        assert!(validated.interview_stage.is_none());
+        assert!(validated.interview_round.is_none());
         assert!(validated.url.is_none());
+    }
+
+    #[test]
+    fn validate_application_input_clears_interview_fields_for_non_interview_status() {
+        let mut input = valid_input();
+        input.status = ApplicationStatus::Offer;
+        let validated = validate_application_input(input).expect("input should validate");
+        assert!(validated.interview_stage.is_none());
+        assert!(validated.interview_round.is_none());
     }
 }

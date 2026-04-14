@@ -40,6 +40,10 @@ const EMPTY_FORM: ApplicationInput = {
   status: 'wishlist',
   jdText: '',
   appliedAt: '',
+  nextAction: '',
+  followUpDate: '',
+  interviewStage: '',
+  interviewRound: '',
   url: '',
   notes: '',
 }
@@ -73,6 +77,8 @@ export default function JobApplicationDialog({
   const handleSubmit = async () => {
     if (!canSubmit) return
 
+    const isInterview = formValues.status === 'interview'
+
     const resumeTitle = formValues.resumeId
       ? resumeOptions.find((option) => option.id === formValues.resumeId)?.title
       : undefined
@@ -86,6 +92,10 @@ export default function JobApplicationDialog({
       resumeTitle,
       url: formValues.url?.trim() || undefined,
       appliedAt: formValues.appliedAt?.trim() || undefined,
+      nextAction: formValues.nextAction?.trim() || undefined,
+      followUpDate: formValues.followUpDate?.trim() || undefined,
+      interviewStage: isInterview ? formValues.interviewStage?.trim() || undefined : undefined,
+      interviewRound: isInterview ? formValues.interviewRound?.trim() || undefined : undefined,
       notes: formValues.notes?.trim() || undefined,
     })
   }
@@ -156,6 +166,58 @@ export default function JobApplicationDialog({
             />
           </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="job-next-action">下一步动作</Label>
+            <Input
+              id="job-next-action"
+              value={formValues.nextAction || ''}
+              onChange={(event) =>
+                setFormValues((prev) => ({ ...prev, nextAction: event.target.value }))
+              }
+              placeholder="例如：约一面 / 发跟进邮件"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="job-follow-up-date">跟进日期</Label>
+            <Input
+              id="job-follow-up-date"
+              value={formValues.followUpDate || ''}
+              onChange={(event) =>
+                setFormValues((prev) => ({ ...prev, followUpDate: event.target.value }))
+              }
+              placeholder="例如：2026-04-18"
+            />
+          </div>
+
+          {formValues.status === 'interview' ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="job-interview-stage">面试阶段</Label>
+                <Input
+                  id="job-interview-stage"
+                  value={formValues.interviewStage || ''}
+                  onChange={(event) =>
+                    setFormValues((prev) => ({ ...prev, interviewStage: event.target.value }))
+                  }
+                  placeholder="例如：HR / 技术面 / 终面"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="job-interview-round">面试轮次</Label>
+                <Input
+                  id="job-interview-round"
+                  value={formValues.interviewRound || ''}
+                  onChange={(event) =>
+                    setFormValues((prev) => ({ ...prev, interviewRound: event.target.value }))
+                  }
+                  placeholder="例如：第 1 轮 / Round 2"
+                />
+              </div>
+            </>
+          ) : null}
+
           <div className="space-y-2 md:col-span-2">
             <Label>关联简历</Label>
             <Select
@@ -209,7 +271,7 @@ export default function JobApplicationDialog({
             id="job-notes"
             value={formValues.notes || ''}
             onChange={(event) => setFormValues((prev) => ({ ...prev, notes: event.target.value }))}
-            placeholder="记录沟通要点、下一步动作或复盘结论"
+            placeholder="记录沟通要点或复盘结论"
             className="min-h-[120px] resize-y"
           />
         </div>

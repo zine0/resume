@@ -43,6 +43,7 @@ import { AISettingsDialog } from '@/components/ai-settings-dialog'
 import { useToast } from '@/hooks/use-toast'
 import JobApplicationDialog from '@/components/job-application-dialog'
 import { aiAnalyzeJD, applyAiPatchToResumeData, JD_SUGGESTION_MODULE_TITLE } from '@/lib/ai-service'
+import { getResumeDisplayTitle, getResumeVariantLabel } from '@/lib/resume-lineage'
 import {
   createEntryFromData,
   createApplication,
@@ -114,6 +115,10 @@ function toInput(application: ApplicationEntry): ApplicationInput {
     resumeTitle: application.resumeTitle,
     url: application.url,
     appliedAt: application.appliedAt,
+    nextAction: application.nextAction,
+    followUpDate: application.followUpDate,
+    interviewStage: application.interviewStage,
+    interviewRound: application.interviewRound,
     notes: application.notes,
   }
 }
@@ -229,10 +234,12 @@ export default function ApplicationBoard() {
     () =>
       resumes.map((resume) => ({
         id: resume.id,
-        title: resume.resumeData.title || '未命名简历',
+        title: getResumeDisplayTitle(resume),
       })),
     [resumes],
   )
+
+  const resumeMap = useMemo(() => new Map(resumes.map((resume) => [resume.id, resume])), [resumes])
 
   const resumeTitleMap = useMemo(
     () => new Map(resumes.map((resume) => [resume.id, resume.resumeData.title || '未命名简历'])),
@@ -252,6 +259,10 @@ export default function ApplicationBoard() {
         application.jdText,
         application.resumeTitle,
         application.url,
+        application.nextAction,
+        application.followUpDate,
+        application.interviewStage,
+        application.interviewRound,
         application.notes,
       ]
         .filter(Boolean)
@@ -459,7 +470,12 @@ export default function ApplicationBoard() {
         { fallbackModuleTitle: JD_SUGGESTION_MODULE_TITLE },
       )
 
-      const newEntry = await createEntryFromData(data)
+      const newEntry = await createEntryFromData(data, {
+        familyId: resume.lineage.familyId,
+        parentResumeId: resume.id,
+        variantKind: 'jdTailored',
+        sourceApplicationId: application.id,
+      })
       createdResumeTitle = newEntry.resumeData.title || '未命名简历'
 
       const updated = await updateApplication(application.id, {
@@ -568,14 +584,38 @@ export default function ApplicationBoard() {
 
         <div className="flex flex-wrap gap-2">
           {linkedResumeTitle ? (
-            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
-              简历 · {linkedResumeTitle}
+            <Badge
+              variant="outline"
+              className="border-primary/20 bg-primary/5 text-primary max-w-full min-w-0 gap-1 overflow-hidden"
+            >
+              <span className="shrink-0">简历 ·</span>
+              <span className="min-w-0 truncate">{linkedResumeTitle}</span>
+            </Badge>
+          ) : null}
+          {application.resumeId && resumeMap.get(application.resumeId) ? (
+            <Badge variant="outline">
+              {getResumeVariantLabel(resumeMap.get(application.resumeId)!.lineage.variantKind)}
             </Badge>
           ) : null}
           {application.appliedAt ? (
             <Badge variant="outline">投递于 {application.appliedAt}</Badge>
           ) : null}
+          {application.followUpDate ? (
+            <Badge variant="outline">跟进 {application.followUpDate}</Badge>
+          ) : null}
+          {application.status === 'interview' && application.interviewStage ? (
+            <Badge variant="outline">阶段 {application.interviewStage}</Badge>
+          ) : null}
+          {application.status === 'interview' && application.interviewRound ? (
+            <Badge variant="outline">轮次 {application.interviewRound}</Badge>
+          ) : null}
         </div>
+
+        {application.nextAction ? (
+          <div className="bg-primary/5 border-primary/15 rounded-lg border px-3 py-2 text-sm">
+            <p className="text-primary font-medium">下一步：{application.nextAction}</p>
+          </div>
+        ) : null}
 
         <Button
           variant="outline"
@@ -679,7 +719,7 @@ export default function ApplicationBoard() {
               <Input
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
-                placeholder="搜索公司、岗位、JD 或备注..."
+                placeholder="搜索公司、岗位、下一步动作、JD 或备注..."
                 className="w-full sm:w-72"
               />
               <Button

@@ -176,6 +176,47 @@ pub struct ResumeData {
     pub updated_at: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ResumeVariantKind {
+    Base,
+    Clone,
+    Optimized,
+    JdTailored,
+}
+
+impl Default for ResumeVariantKind {
+    fn default() -> Self {
+        Self::Base
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ResumeLineage {
+    #[serde(default)]
+    pub family_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_resume_id: Option<String>,
+    #[serde(default = "default_resume_variant_kind")]
+    pub variant_kind: ResumeVariantKind,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source_application_id: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateResumeLineageInput {
+    #[serde(default)]
+    pub family_id: Option<String>,
+    #[serde(default)]
+    pub parent_resume_id: Option<String>,
+    #[serde(default)]
+    pub variant_kind: Option<ResumeVariantKind>,
+    #[serde(default)]
+    pub source_application_id: Option<String>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct StoredResume {
@@ -183,6 +224,8 @@ pub struct StoredResume {
     pub created_at: String,
     pub updated_at: String,
     pub resume_data: ResumeData,
+    #[serde(default)]
+    pub lineage: ResumeLineage,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -241,6 +284,10 @@ fn default_avatar_shape() -> AvatarShape {
 
 fn default_avatar_type() -> AvatarType {
     AvatarType::Default
+}
+
+fn default_resume_variant_kind() -> ResumeVariantKind {
+    ResumeVariantKind::Base
 }
 
 fn empty_rich_text_doc() -> Value {

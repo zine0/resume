@@ -162,6 +162,22 @@ export interface ResumeData {
   updatedAt: string
 }
 
+export type ResumeVariantKind = 'base' | 'clone' | 'optimized' | 'jdTailored'
+
+export interface ResumeLineage {
+  familyId: string
+  parentResumeId?: string
+  variantKind: ResumeVariantKind
+  sourceApplicationId?: string
+}
+
+export interface CreateResumeLineageInput {
+  familyId?: string
+  parentResumeId?: string
+  variantKind?: ResumeVariantKind
+  sourceApplicationId?: string
+}
+
 /**
  * 本地存储的简历条目结构
  */
@@ -174,6 +190,8 @@ export interface StoredResume {
   updatedAt: string
   /** 实际的简历数据 */
   resumeData: ResumeData
+  /** 版本谱系信息 */
+  lineage: ResumeLineage
 }
 
 /** 本地存储使用的 Key */

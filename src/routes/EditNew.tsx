@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import ResumeBuilder from '@/components/resume-builder'
-import type { ResumeData } from '@/types/resume'
+import type { CreateResumeLineageInput, ResumeData, StoredResume } from '@/types/resume'
 import { createEntryFromData, StorageError, getResumeById } from '@/lib/storage'
 import { useToast } from '@/hooks/use-toast'
 
@@ -36,17 +36,32 @@ function EditNewContent() {
 
   // 异步加载克隆数据
   const [clonedData, setClonedData] = useState<ResumeData | undefined>(undefined)
+  const [clonedEntry, setClonedEntry] = useState<StoredResume | null>(null)
 
   useEffect(() => {
     if (!cloneId) return
     getResumeById(cloneId).then((entry) => {
-      if (entry) setClonedData({ ...entry.resumeData })
+      if (entry) {
+        setClonedEntry(entry)
+        setClonedData({ ...entry.resumeData })
+      }
     })
   }, [cloneId])
 
+  const buildDerivedLineage = (
+    variantKind: CreateResumeLineageInput['variantKind'],
+  ): CreateResumeLineageInput | undefined => {
+    if (!clonedEntry || !variantKind) return undefined
+    return {
+      familyId: clonedEntry.lineage.familyId,
+      parentResumeId: clonedEntry.id,
+      variantKind,
+    }
+  }
+
   const handleSave = async (current: ResumeData) => {
     try {
-      const entry = await createEntryFromData(current)
+      const entry = await createEntryFromData(current, buildDerivedLineage('clone'))
       toast({ title: '保存成功', description: `已创建：${entry.resumeData.title}` })
       navigate(`/edit/${entry.id}`, { replace: true })
     } catch (e: unknown) {
@@ -63,8 +78,11 @@ function EditNewContent() {
     }
   }
 
-  const handleCreateResumeCopy = async (data: ResumeData) => {
-    const entry = await createEntryFromData(data)
+  const handleCreateResumeCopy = async (
+    data: ResumeData,
+    variantKind: CreateResumeLineageInput['variantKind'],
+  ) => {
+    const entry = await createEntryFromData(data, buildDerivedLineage(variantKind))
     navigate(`/edit/${entry.id}`)
   }
 
@@ -75,8 +93,8 @@ function EditNewContent() {
         template={useExample ? 'example' : 'default'}
         onBack={() => navigate('/resumes')}
         onSave={(d) => handleSave(d)}
-        onCreateTailoredResume={(d) => handleCreateResumeCopy(d)}
-        onCreateOptimizedResume={(d) => handleCreateResumeCopy(d)}
+        onCreateTailoredResume={(d) => handleCreateResumeCopy(d, 'jdTailored')}
+        onCreateOptimizedResume={(d) => handleCreateResumeCopy(d, 'optimized')}
       />
     </main>
   )
