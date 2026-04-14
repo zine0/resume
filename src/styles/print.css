@@ -61,7 +61,7 @@
     line-height: 1.45;
     color: #000 !important;
     background: white !important;
-    font-family: 'Microsoft YaHei', 'SimSun', 'Arial', sans-serif !important;
+    font-family: var(--font-family-sans) !important;
   }
 
   /* 分页策略：
@@ -389,7 +389,7 @@
   font-size: 11pt;
   line-height: 1.55;
   color: #000;
-  font-family: 'Microsoft YaHei', 'SimSun', 'Arial', sans-serif;
+  font-family: var(--font-family-sans);
 }
 
 .pdf-preview-mode .resume-title {

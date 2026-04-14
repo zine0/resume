@@ -348,7 +348,7 @@ export function ExportButton({
     setIsExporting(true)
     try {
       const normalized = normalizeResumeDataForAvatar(resumeData)
-      const html = resumeDataToHtml(normalized)
+      const html = await resumeDataToHtml(normalized)
       const filename = generatePdfFilename(normalized.title || '')
 
       const pdfPath = await invokeTauriPdf(html, filename)

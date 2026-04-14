@@ -9,6 +9,7 @@ import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
 import { Extension } from '@tiptap/core'
 import type { JSONContent } from '@/types/resume'
+import { stripFontFamilyFromRichContent } from '@/lib/rich-text'
 
 interface RichTextRendererProps {
   content: JSONContent
@@ -58,6 +59,8 @@ const getDefaultContent = (): JSONContent => ({
  * Read-only Tiptap renderer for preview
  */
 export default function RichTextRenderer({ content, className = '' }: RichTextRendererProps) {
+  const sanitizedContent = stripFontFamilyFromRichContent(content || getDefaultContent())
+
   const editor = useEditor({
     immediatelyRender: false,
     extensions: [
@@ -85,7 +88,7 @@ export default function RichTextRenderer({ content, className = '' }: RichTextRe
         types: ['paragraph'],
       }),
     ],
-    content: content || getDefaultContent(),
+    content: sanitizedContent,
     editable: false,
     editorProps: {
       attributes: {
@@ -98,7 +101,7 @@ export default function RichTextRenderer({ content, className = '' }: RichTextRe
   useEffect(() => {
     if (!editor) return
 
-    const newContent = content || getDefaultContent()
+    const newContent = stripFontFamilyFromRichContent(content || getDefaultContent())
     const currentContent = editor.getJSON()
 
     // Only update if content actually changed

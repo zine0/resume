@@ -12,6 +12,7 @@ import { Plugin } from '@tiptap/pm/state'
 import type { EditorView } from '@tiptap/pm/view'
 import type { ModuleContentElement, JSONContent } from '@/types/resume'
 import { useToolbarManager } from './rich-text-toolbar-manager'
+import { stripFontFamilyFromRichContent } from '@/lib/rich-text'
 
 interface RichTextInputProps {
   element: ModuleContentElement
@@ -99,6 +100,7 @@ export default function RichTextInput({
   showBorder = true,
 }: RichTextInputProps) {
   const { registerEditor, unregisterEditor } = useToolbarManager()
+  const sanitizedContent = stripFontFamilyFromRichContent(element.content || getDefaultContent())
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -128,7 +130,7 @@ export default function RichTextInput({
         types: ['paragraph'],
       }),
     ],
-    content: element.content || getDefaultContent(),
+    content: sanitizedContent,
     editorProps: {
       attributes: {
         class: `rt-editor min-h-[40px] px-3 py-2 focus:outline-none ${
@@ -137,7 +139,7 @@ export default function RichTextInput({
       },
     },
     onUpdate: ({ editor }) => {
-      const json = editor.getJSON()
+      const json = stripFontFamilyFromRichContent(editor.getJSON())
       onChange({ content: json })
     },
   })
@@ -158,7 +160,7 @@ export default function RichTextInput({
     if (!editor) return
 
     const currentJson = editor.getJSON()
-    const newJson = element.content || getDefaultContent()
+    const newJson = stripFontFamilyFromRichContent(element.content || getDefaultContent())
 
     // Only update if content actually changed to avoid cursor jumping
     if (JSON.stringify(currentJson) !== JSON.stringify(newJson)) {
