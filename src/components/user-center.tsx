@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -41,6 +41,15 @@ import { getResumeLineageHint, getResumeVariantLabel } from '@/lib/resume-lineag
 
 type SortKey = 'name' | 'createdAt' | 'updatedAt'
 type SortDir = 'asc' | 'desc'
+
+interface ResumeFamilyGroup {
+  familyId: string
+  items: StoredResume[]
+}
+
+function getFamilyId(item: StoredResume): string {
+  return item.lineage.familyId || item.id
+}
 
 export default function UserCenter() {
   const navigate = useNavigate()
@@ -100,6 +109,41 @@ export default function UserCenter() {
     return sorted
   }, [items, keyword, sortKey, sortDir])
 
+  const groupedFamilies = useMemo<ResumeFamilyGroup[]>(() => {
+    const groups = new Map<string, ResumeFamilyGroup>()
+
+    for (const item of filteredSorted) {
+      const familyId = getFamilyId(item)
+      const current = groups.get(familyId)
+
+      if (current) {
+        current.items.push(item)
+      } else {
+        groups.set(familyId, { familyId, items: [item] })
+      }
+    }
+
+    return Array.from(groups.values())
+  }, [filteredSorted])
+
+  const familySizes = useMemo(() => {
+    const sizes = new Map<string, number>()
+
+    for (const item of items) {
+      const familyId = getFamilyId(item)
+      sizes.set(familyId, (sizes.get(familyId) ?? 0) + 1)
+    }
+
+    return sizes
+  }, [items])
+
+  const visibleIds = useMemo(() => filteredSorted.map((item) => item.id), [filteredSorted])
+  const visibleSelectedIds = useMemo(
+    () => visibleIds.filter((id) => selected.has(id)),
+    [selected, visibleIds],
+  )
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id))
+
   const SortArrows = ({ field }: { field: SortKey }) => {
     const activeAsc = sortKey === field && sortDir === 'asc'
     const activeDesc = sortKey === field && sortDir === 'desc'
@@ -135,8 +179,16 @@ export default function UserCenter() {
   }
 
   const toggleSelectAll = (checked: boolean) => {
-    if (checked) setSelected(new Set(items.map((i) => i.id)))
-    else setSelected(new Set())
+    setSelected((prev) => {
+      const next = new Set(prev)
+
+      for (const id of visibleIds) {
+        if (checked) next.add(id)
+        else next.delete(id)
+      }
+
+      return next
+    })
   }
 
   // 将初始化数据预加载并写入 sessionStorage，然后再跳转，避免在新页面内数据“闪变”
@@ -266,7 +318,7 @@ export default function UserCenter() {
               <Button
                 variant="destructive"
                 className="gap-2"
-                disabled={selected.size === 0}
+                disabled={visibleSelectedIds.length === 0}
                 onClick={() => setConfirmOpen(true)}
               >
                 <Icon icon="mdi:trash-can" className="h-4 w-4" /> 批量删除
@@ -280,15 +332,17 @@ export default function UserCenter() {
 
       {/* 列表（表格） */}
       <div className="space-y-3 p-4">
-        {items.length > 0 && (
+        {filteredSorted.length > 0 && (
           <div className="flex items-center gap-3 px-2">
             <input
               type="checkbox"
               className="h-4 w-4 rounded border"
-              checked={selected.size > 0 && selected.size === items.length}
+              checked={allVisibleSelected}
               onChange={(e) => toggleSelectAll(e.target.checked)}
             />
-            <span className="text-muted-foreground text-sm">已选 {selected.size} 项</span>
+            <span className="text-muted-foreground text-sm">
+              当前结果中已选 {visibleSelectedIds.length} 项
+            </span>
           </div>
         )}
         {filteredSorted.length === 0 ? (
@@ -297,50 +351,75 @@ export default function UserCenter() {
               <div className="bg-primary/10 mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full">
                 <Icon icon="mdi:file-document-edit" className="text-primary h-8 w-8" />
               </div>
-              <h3 className="text-xl font-semibold">暂无简历</h3>
+              <h3 className="text-xl font-semibold">
+                {items.length === 0 ? '暂无简历' : '未找到匹配的简历'}
+              </h3>
               <div className="mt-2 inline-flex flex-col items-stretch">
                 <p className="text-muted-foreground text-sm">
-                  点击“创建简历”开始，或从 JSON 文件导入已有数据并继续编辑
+                  {items.length === 0
+                    ? '点击“创建简历”开始，或从 JSON 文件导入已有数据并继续编辑'
+                    : '请尝试调整搜索关键词，或清空筛选后查看全部简历'}
                 </p>
                 <div className="mt-6 flex items-center justify-between">
-                  <Button onClick={handleCreate} className="shrink-0 gap-2">
-                    <Icon icon="mdi:plus" className="h-4 w-4" /> 创建简历
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="shrink-0 gap-2"
-                    onClick={() => document.getElementById('uc-import-file')?.click()}
-                    disabled={importing}
-                  >
-                    <Icon icon="mdi:import" className="h-4 w-4" /> 导入
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="shrink-0 gap-2"
-                    onClick={() => navigate('/')}
-                  >
-                    <Icon icon="mdi:view-kanban-outline" className="h-4 w-4" /> 求职看板
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="shrink-0 gap-2"
-                    onClick={() => prefetchAndOpenNew('example')}
-                  >
-                    <Icon icon="mdi:lightbulb-on" className="h-4 w-4" /> 示例
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="shrink-0 gap-2"
-                    onClick={() =>
-                      window.open(
-                        'https://github.com/wzdnzd/resume',
-                        '_blank',
-                        'noopener,noreferrer',
-                      )
-                    }
-                  >
-                    <Icon icon="mdi:github" className="h-4 w-4" /> GitHub
-                  </Button>
+                  {items.length === 0 ? (
+                    <>
+                      <Button onClick={handleCreate} className="shrink-0 gap-2">
+                        <Icon icon="mdi:plus" className="h-4 w-4" /> 创建简历
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="shrink-0 gap-2"
+                        onClick={() => document.getElementById('uc-import-file')?.click()}
+                        disabled={importing}
+                      >
+                        <Icon icon="mdi:import" className="h-4 w-4" /> 导入
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="shrink-0 gap-2"
+                        onClick={() => navigate('/')}
+                      >
+                        <Icon icon="mdi:view-kanban-outline" className="h-4 w-4" /> 求职看板
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="shrink-0 gap-2"
+                        onClick={() => prefetchAndOpenNew('example')}
+                      >
+                        <Icon icon="mdi:lightbulb-on" className="h-4 w-4" /> 示例
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="shrink-0 gap-2"
+                        onClick={() =>
+                          window.open(
+                            'https://github.com/wzdnzd/resume',
+                            '_blank',
+                            'noopener,noreferrer',
+                          )
+                        }
+                      >
+                        <Icon icon="mdi:github" className="h-4 w-4" /> GitHub
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        className="shrink-0 gap-2"
+                        onClick={() => setKeyword('')}
+                      >
+                        <Icon icon="mdi:close-circle-outline" className="h-4 w-4" /> 清空搜索
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="shrink-0 gap-2"
+                        onClick={() => navigate('/')}
+                      >
+                        <Icon icon="mdi:view-kanban-outline" className="h-4 w-4" /> 求职看板
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -373,85 +452,109 @@ export default function UserCenter() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredSorted.map((it) => (
-                <TableRow key={it.id}>
-                  <TableCell>
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border"
-                      checked={selected.has(it.id)}
-                      onChange={(e) => toggleSelect(it.id, e.target.checked)}
-                    />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-center text-xs">
-                    {it.id.slice(0, 8)}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="bg-muted mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-full">
-                      <img
-                        src={it.resumeData.avatar || '/not-set.png'}
-                        alt={it.resumeData.title}
-                        className="h-full w-full object-cover"
-                        onError={(ev) => {
-                          ;(ev.currentTarget as HTMLImageElement).src = '/default-avatar.jpg'
-                        }}
-                      />
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{it.resumeData.title || '未命名'}</span>
-                        <Badge variant="outline">
-                          {getResumeVariantLabel(it.lineage.variantKind)}
-                        </Badge>
+              {groupedFamilies.map((group) => (
+                <Fragment key={group.familyId}>
+                  <TableRow className="bg-muted/20 hover:bg-muted/20">
+                    <TableCell colSpan={7} className="py-2">
+                      <div className="flex items-center gap-2 text-xs">
+                        <Badge variant="secondary">家族</Badge>
+                        <span className="font-medium">{group.familyId.slice(0, 8)}</span>
+                        <span className="text-muted-foreground">
+                          {(() => {
+                            const totalCount = familySizes.get(group.familyId) ?? group.items.length
+                            return totalCount === group.items.length
+                              ? `共 ${totalCount} 份简历`
+                              : `显示 ${group.items.length} / 共 ${totalCount} 份简历`
+                          })()}
+                        </span>
                       </div>
-                      {getResumeLineageHint(it.lineage) ? (
-                        <p className="text-muted-foreground text-xs">
-                          {getResumeLineageHint(it.lineage)}
-                        </p>
-                      ) : null}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center text-xs">
-                    {new Date(it.createdAt).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="text-center text-xs">
-                    {new Date(it.updatedAt).toLocaleString()}
-                  </TableCell>
-                  <TableCell className="w-[360px] text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        className="gap-2"
-                        onClick={() => navigate(`/view/${it.id}`)}
-                      >
-                        <Icon icon="mdi:eye" className="h-4 w-4" /> 查看
-                      </Button>
-                      <ExportButton resumeData={it.resumeData} variant="ghost" />
-                      <Button
-                        variant="ghost"
-                        className="gap-2"
-                        onClick={() => navigate(`/edit/${it.id}`)}
-                      >
-                        <Icon icon="mdi:pencil" className="h-4 w-4" /> 编辑
-                      </Button>
-                      <Button variant="ghost" className="gap-2" onClick={() => handleClone(it.id)}>
-                        <Icon icon="mdi:content-copy" className="h-4 w-4" /> 克隆
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="hover:bg-destructive gap-2 hover:text-white"
-                        onClick={() => {
-                          setSelected(new Set([it.id]))
-                          setConfirmOpen(true)
-                        }}
-                      >
-                        <Icon icon="mdi:delete" className="h-4 w-4" /> 删除
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                  </TableRow>
+                  {group.items.map((it) => (
+                    <TableRow key={it.id}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border"
+                          checked={selected.has(it.id)}
+                          onChange={(e) => toggleSelect(it.id, e.target.checked)}
+                        />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-center text-xs">
+                        {it.id.slice(0, 8)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="bg-muted mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-full">
+                          <img
+                            src={it.resumeData.avatar || '/not-set.png'}
+                            alt={it.resumeData.title}
+                            className="h-full w-full object-cover"
+                            onError={(ev) => {
+                              ;(ev.currentTarget as HTMLImageElement).src = '/default-avatar.jpg'
+                            }}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{it.resumeData.title || '未命名'}</span>
+                            <Badge variant="outline">
+                              {getResumeVariantLabel(it.lineage.variantKind)}
+                            </Badge>
+                          </div>
+                          {getResumeLineageHint(it.lineage) ? (
+                            <p className="text-muted-foreground text-xs">
+                              {getResumeLineageHint(it.lineage)}
+                            </p>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center text-xs">
+                        {new Date(it.createdAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="text-center text-xs">
+                        {new Date(it.updatedAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="w-[360px] text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            className="gap-2"
+                            onClick={() => navigate(`/view/${it.id}`)}
+                          >
+                            <Icon icon="mdi:eye" className="h-4 w-4" /> 查看
+                          </Button>
+                          <ExportButton resumeData={it.resumeData} variant="ghost" />
+                          <Button
+                            variant="ghost"
+                            className="gap-2"
+                            onClick={() => navigate(`/edit/${it.id}`)}
+                          >
+                            <Icon icon="mdi:pencil" className="h-4 w-4" /> 编辑
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="gap-2"
+                            onClick={() => handleClone(it.id)}
+                          >
+                            <Icon icon="mdi:content-copy" className="h-4 w-4" /> 克隆
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="hover:bg-destructive gap-2 hover:text-white"
+                            onClick={() => {
+                              setSelected(new Set([it.id]))
+                              setConfirmOpen(true)
+                            }}
+                          >
+                            <Icon icon="mdi:delete" className="h-4 w-4" /> 删除
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </Fragment>
               ))}
             </TableBody>
           </Table>
@@ -471,7 +574,7 @@ export default function UserCenter() {
             <AlertDialogCancel>取消</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                handleDelete(Array.from(selected))
+                handleDelete(visibleSelectedIds)
                 setConfirmOpen(false)
               }}
             >
