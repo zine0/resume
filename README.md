@@ -199,6 +199,7 @@ pnpm tauri:build
 
 ## 可继续扩展的方向
 
+- 查看详细规划：[`docs/roadmap.md`](./docs/roadmap.md)
 - 提升 PDF 失败时的错误提示与降级体验
 - 进一步统一主题持久化与其它桌面端状态管理策略
 - 补充 Windows / macOS / Linux 的打包验证
