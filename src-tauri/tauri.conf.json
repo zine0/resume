@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "com.resumebuilder.release",
   "productName": "ResumeBuilder",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "beforeBuildCommand": "pnpm build",

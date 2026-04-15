@@ -110,7 +110,7 @@ fn read_storage_from_path(path: &Path) -> Result<StorageData, String> {
         return Ok(StorageData { entries: vec![] });
     }
 
-    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
     if let Ok(storage) = serde_json::from_str::<StorageData>(&content) {
         let entries = storage
             .entries

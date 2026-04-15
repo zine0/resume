@@ -178,18 +178,15 @@ pub struct ResumeData {
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum ResumeVariantKind {
+    #[default]
     Base,
     Clone,
     Optimized,
     JdTailored,
 }
 
-impl Default for ResumeVariantKind {
-    fn default() -> Self {
-        Self::Base
-    }
-}
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
