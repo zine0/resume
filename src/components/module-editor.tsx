@@ -28,22 +28,43 @@ import FloatingActionBar from './floating-action-bar'
 import RichTextInput from './rich-text-input'
 import TagInput from './tag-input'
 import {
-  DragDropContext,
-  Droppable,
-  Draggable,
-  DropResult,
-  DraggableProvidedDragHandleProps,
-} from '@hello-pangea/dnd'
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface ModuleEditorProps {
   modules: ResumeModule[]
   onUpdate: (modules: ResumeModule[]) => void
 }
 
+type SortableHandleProps = Pick<ReturnType<typeof useSortable>, 'attributes' | 'listeners'>
+
+function buildInlineSvgDataUrl(icon?: string) {
+  if (!icon) return ''
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${icon}</svg>`)}`
+}
+
 export default function ModuleEditor({ modules, onUpdate }: ModuleEditorProps) {
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set())
   const [isAddingModule, setIsAddingModule] = useState(false)
   const { toast } = useToast()
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+  )
+  const sortedModules = [...modules].sort((a, b) => a.order - b.order)
 
   /**
    * 添加新模块
@@ -99,17 +120,18 @@ export default function ModuleEditor({ modules, onUpdate }: ModuleEditorProps) {
   /**
    * 处理模块拖拽
    */
-  const handleModuleDragEnd = (result: DropResult) => {
-    if (!result.destination) return
-    if (result.source.index === result.destination.index) return
+  const handleModuleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
 
-    const updatedModules = [...modules]
-    const [movedModule] = updatedModules.splice(result.source.index, 1)
-    updatedModules.splice(result.destination.index, 0, movedModule)
+    const oldIndex = sortedModules.findIndex((module) => module.id === active.id)
+    const newIndex = sortedModules.findIndex((module) => module.id === over.id)
+    if (oldIndex < 0 || newIndex < 0 || oldIndex === newIndex) return
 
-    updatedModules.forEach((module, index) => {
-      module.order = index
-    })
+    const updatedModules = arrayMove(sortedModules, oldIndex, newIndex).map((module, index) => ({
+      ...module,
+      order: index,
+    }))
 
     onUpdate(updatedModules)
   }
@@ -148,51 +170,56 @@ export default function ModuleEditor({ modules, onUpdate }: ModuleEditorProps) {
         </Button>
       </div>
 
-      <DragDropContext onDragEnd={handleModuleDragEnd}>
-        <Droppable droppableId="modules-list">
-          {(provided) => (
-            <div className="space-y-3" {...provided.droppableProps} ref={provided.innerRef}>
-              {modules
-                .sort((a, b) => a.order - b.order)
-                .map((module, index) => (
-                  <Draggable key={module.id} draggableId={module.id} index={index}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        style={{
-                          ...provided.draggableProps.style,
-                          opacity: snapshot.isDragging ? 0.8 : 1,
-                        }}
-                      >
-                        <ModuleItem
-                          module={module}
-                          isExpanded={expandedModules.has(module.id)}
-                          dragHandleProps={provided.dragHandleProps}
-                          onToggle={() => toggleModule(module.id)}
-                          onUpdate={(updates) => updateModule(module.id, updates)}
-                          onRemove={() => removeModule(module.id)}
-                        />
-                      </div>
-                    )}
-                  </Draggable>
-                ))}
-              {provided.placeholder}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleModuleDragEnd}
+      >
+        <SortableContext
+          items={sortedModules.map((module) => module.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-3">
+            {sortedModules.map((module) => (
+              <SortableModuleItem
+                key={module.id}
+                module={module}
+                isExpanded={expandedModules.has(module.id)}
+                onToggle={() => toggleModule(module.id)}
+                onUpdate={(updates) => updateModule(module.id, updates)}
+                onRemove={() => removeModule(module.id)}
+              />
+            ))}
 
-              {modules.length === 0 && (
-                <div className="text-muted-foreground py-8 text-center">
-                  <Icon
-                    icon="mdi:view-module-outline"
-                    className="mx-auto mb-2 h-8 w-8 opacity-50"
-                  />
-                  <p className="text-sm">暂无简历模块，点击"添加模块"开始编辑</p>
-                </div>
-              )}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+            {modules.length === 0 && (
+              <div className="text-muted-foreground py-8 text-center">
+                <Icon icon="mdi:view-module-outline" className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                <p className="text-sm">暂无简历模块，点击"添加模块"开始编辑</p>
+              </div>
+            )}
+          </div>
+        </SortableContext>
+      </DndContext>
     </Card>
+  )
+}
+
+function SortableModuleItem({ module, ...props }: Omit<ModuleItemProps, 'dragHandleProps'>) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: module.id,
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.8 : 1,
+      }}
+    >
+      <ModuleItem module={module} dragHandleProps={{ attributes, listeners }} {...props} />
+    </div>
   )
 }
 
@@ -202,7 +229,7 @@ export default function ModuleEditor({ modules, onUpdate }: ModuleEditorProps) {
 interface ModuleItemProps {
   module: ResumeModule
   isExpanded: boolean
-  dragHandleProps: DraggableProvidedDragHandleProps | null
+  dragHandleProps: SortableHandleProps | null
   onToggle: () => void
   onUpdate: (updates: Partial<ResumeModule>) => void
   onRemove: () => void
@@ -321,26 +348,24 @@ function ModuleItem({
     <>
       <div className="bg-muted/30 rounded-lg border">
         {/* 模块头部 */}
-        <div
-          className="hover:bg-muted/50 relative cursor-pointer p-3 transition-colors"
-          onClick={onToggle}
-        >
+        <div className="hover:bg-muted/50 relative p-3 transition-colors">
           <div className="flex items-center gap-3">
-            {module.icon ? (
-              <svg
-                width={16}
-                height={16}
-                viewBox="0 0 24 24"
-                dangerouslySetInnerHTML={{ __html: module.icon }}
+            <button
+              type="button"
+              onClick={onToggle}
+              className="flex min-w-0 flex-1 items-center gap-3 text-left"
+            >
+              {module.icon ? (
+                <img src={buildInlineSvgDataUrl(module.icon)} alt="模块图标" className="h-4 w-4" />
+              ) : (
+                <div className="h-4 w-4 rounded-sm border border-dashed border-gray-400" />
+              )}
+              <span className="truncate font-medium">{module.title || '未命名模块'}</span>
+              <Icon
+                icon={isExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
+                className="text-muted-foreground ml-auto h-4 w-4"
               />
-            ) : (
-              <div className="h-4 w-4 rounded-sm border border-dashed border-gray-400" />
-            )}
-            <span className="font-medium">{module.title || '未命名模块'}</span>
-            <Icon
-              icon={isExpanded ? 'mdi:chevron-up' : 'mdi:chevron-down'}
-              className="text-muted-foreground ml-auto h-4 w-4"
-            />
+            </button>
             <Button
               size="sm"
               variant="ghost"
@@ -353,14 +378,16 @@ function ModuleItem({
             >
               <Icon icon="mdi:delete" className="h-4 w-4" />
             </Button>
-            <div {...dragHandleProps} onClick={(e) => e.stopPropagation()}>
-              <span role="button" aria-label="拖拽排序" className="contents">
-                <Icon
-                  icon="mdi:drag"
-                  className="text-muted-foreground h-4 w-4 cursor-grab active:cursor-grabbing"
-                />
-              </span>
-            </div>
+            <button
+              type="button"
+              {...dragHandleProps?.attributes}
+              {...dragHandleProps?.listeners}
+              onClick={(e) => e.stopPropagation()}
+              aria-label="拖拽排序"
+              className="text-muted-foreground flex h-8 w-8 cursor-grab items-center justify-center active:cursor-grabbing"
+            >
+              <Icon icon="mdi:drag" className="h-4 w-4" />
+            </button>
           </div>
         </div>
 
@@ -381,11 +408,10 @@ function ModuleItem({
                   <DialogTrigger asChild>
                     <Button variant="outline" className="w-full justify-start gap-2 bg-transparent">
                       {module.icon ? (
-                        <svg
-                          width={16}
-                          height={16}
-                          viewBox="0 0 24 24"
-                          dangerouslySetInnerHTML={{ __html: module.icon }}
+                        <img
+                          src={buildInlineSvgDataUrl(module.icon)}
+                          alt="当前图标"
+                          className="h-4 w-4"
                         />
                       ) : (
                         <div className="h-4 w-4 rounded-sm border border-dashed border-gray-400" />
@@ -482,20 +508,14 @@ interface EmptyRowPlaceholderProps {
 }
 
 function EmptyRowPlaceholder({ onAddRow, onAddTagsRow }: EmptyRowPlaceholderProps) {
-  const [hoveredEmpty, setHoveredEmpty] = useState(false)
-
   return (
-    <div
-      className="relative pb-5"
-      onMouseEnter={() => setHoveredEmpty(true)}
-      onMouseLeave={() => setHoveredEmpty(false)}
-    >
+    <div className="group relative pb-5">
       <div className="text-muted-foreground relative rounded-lg border-2 border-dashed py-6 text-center">
         <p className="text-sm">暂无内容，悬浮到此处添加行</p>
 
-        {hoveredEmpty && (
+        <div className="pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
           <FloatingActionBar onAddRow={onAddRow} onAddTagsRow={onAddTagsRow} onDelete={() => {}} />
-        )}
+        </div>
       </div>
     </div>
   )
@@ -509,7 +529,6 @@ function ContentRowEditor({
   onAddRow,
   onAddTagsRow,
 }: ContentRowEditorProps) {
-  const [hoveredRow, setHoveredRow] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   const handleDelete = () => {
@@ -519,11 +538,7 @@ function ContentRowEditor({
 
   return (
     <>
-      <div
-        className="relative pb-5"
-        onMouseEnter={() => setHoveredRow(true)}
-        onMouseLeave={() => setHoveredRow(false)}
-      >
+      <div className="group relative pb-5">
         <div className="relative rounded-lg border bg-white">
           {row.type === 'tags' ? (
             <div className="p-2">
@@ -553,13 +568,13 @@ function ContentRowEditor({
             </div>
           )}
 
-          {hoveredRow && (
+          <div className="pointer-events-none opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100">
             <FloatingActionBar
               onAddRow={(columns) => onAddRow(columns, row.id)}
               onAddTagsRow={onAddTagsRow}
               onDelete={() => setShowDeleteConfirm(true)}
             />
-          )}
+          </div>
         </div>
       </div>
 

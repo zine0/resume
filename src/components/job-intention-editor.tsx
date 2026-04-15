@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -22,8 +22,21 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Icon } from '@iconify/react'
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
+import {
+  closestCenter,
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { JobIntentionItem, JobIntentionSection } from '@/types/resume'
 import { createJobIntentionItem } from '@/lib/storage'
 import { useToast } from '@/hooks/use-toast'
@@ -32,6 +45,8 @@ interface JobIntentionEditorProps {
   jobIntentionSection?: JobIntentionSection
   onUpdate: (jobIntentionSection: JobIntentionSection) => void
 }
+
+type SortableHandleProps = Pick<ReturnType<typeof useSortable>, 'attributes' | 'listeners'>
 
 /**
  * 求职意向编辑器组件
@@ -44,29 +59,33 @@ export default function JobIntentionEditor({
   const [isAddingItem, setIsAddingItem] = useState(false)
   const enabled = jobIntentionSection?.enabled ?? true
   const items = jobIntentionSection?.items || []
-
-  // 同步外部 enabled 变化到本地状态，确保预览与编辑一致
-  useEffect(() => {
-    // enabled synchronized via props
-  }, [jobIntentionSection?.enabled])
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+  )
+  const sortedItems = [...items].sort((a, b) => a.order - b.order)
 
   /**
    * 处理拖拽排序结束事件
    */
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) return
+  const handleDragEnd = (event: DragEndEvent) => {
+    if (!enabled) return
 
-    const source = result.source
-    const destination = result.destination
+    const { active, over } = event
+    if (!over || active.id === over.id) return
 
-    if (source.index === destination.index) return
+    const sourceIndex = sortedItems.findIndex((item) => item.id === active.id)
+    const destinationIndex = sortedItems.findIndex((item) => item.id === over.id)
 
-    const sortedItems = [...items].sort((a, b) => a.order - b.order)
-    const [movedItem] = sortedItems.splice(source.index, 1)
-    sortedItems.splice(destination.index, 0, movedItem)
+    if (sourceIndex < 0 || destinationIndex < 0 || sourceIndex === destinationIndex) return
+
+    const reorderedItems = arrayMove(sortedItems, sourceIndex, destinationIndex)
 
     // 更新order字段
-    const updatedItems = sortedItems.map((item, index) => ({
+    const updatedItems = reorderedItems.map((item, index) => ({
       ...item,
       order: index,
     }))
@@ -229,37 +248,24 @@ export default function JobIntentionEditor({
 
       <div className="space-y-4">
         {/* 求职意向项列表 */}
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="job-intention-list">
-            {(provided) => (
-              <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3">
-                {items
-                  .sort((a, b) => a.order - b.order)
-                  .map((item, index) => (
-                    <Draggable key={item.id} draggableId={item.id} index={index}>
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          className={snapshot.isDragging ? 'opacity-50' : ''}
-                        >
-                          <JobIntentionItemEditor
-                            item={item}
-                            onUpdate={(updates) => updateItem(item.id, updates)}
-                            onRemove={() => removeItem(item.id)}
-                            dragHandleProps={provided.dragHandleProps}
-                            isDragging={snapshot.isDragging}
-                            disabled={!enabled}
-                          />
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={sortedItems.map((item) => item.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-3">
+              {sortedItems.map((item) => (
+                <SortableJobIntentionItem
+                  key={item.id}
+                  item={item}
+                  onUpdate={(updates) => updateItem(item.id, updates)}
+                  onRemove={() => removeItem(item.id)}
+                  disabled={!enabled}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
 
         {items.length === 0 && (
           <div className="text-muted-foreground py-8 text-center">
@@ -272,6 +278,45 @@ export default function JobIntentionEditor({
   )
 }
 
+interface SortableJobIntentionItemProps {
+  item: JobIntentionItem
+  onUpdate: (updates: Partial<JobIntentionItem>) => void
+  onRemove: () => void
+  disabled: boolean
+}
+
+function SortableJobIntentionItem({
+  item,
+  onUpdate,
+  onRemove,
+  disabled,
+}: SortableJobIntentionItemProps) {
+  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
+    id: item.id,
+    disabled,
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+    >
+      <JobIntentionItemEditor
+        item={item}
+        onUpdate={onUpdate}
+        onRemove={onRemove}
+        dragHandleProps={disabled ? null : { attributes, listeners }}
+        isDragging={isDragging}
+        disabled={disabled}
+      />
+    </div>
+  )
+}
+
 /**
  * 求职意向项编辑器
  */
@@ -279,7 +324,7 @@ interface JobIntentionItemEditorProps {
   item: JobIntentionItem
   onUpdate: (updates: Partial<JobIntentionItem>) => void
   onRemove: () => void
-  dragHandleProps?: DraggableProvidedDragHandleProps | null
+  dragHandleProps?: SortableHandleProps | null
   isDragging?: boolean
   disabled?: boolean
 }
@@ -468,14 +513,16 @@ function JobIntentionItemEditor({
           </Button>
 
           {/* 拖拽手柄 */}
-          <div
-            {...dragHandleProps}
-            role="button"
+          <button
+            type="button"
+            {...(dragHandleProps?.attributes ?? {})}
+            {...(dragHandleProps?.listeners ?? {})}
             aria-label="拖拽排序"
+            disabled={disabled}
             className={`text-muted-foreground hover:text-foreground flex h-8 w-8 flex-shrink-0 cursor-grab items-center justify-center rounded active:cursor-grabbing ${isDragging ? 'text-foreground' : ''} ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
           >
             <Icon icon="mdi:drag" className="h-4 w-4" />
-          </div>
+          </button>
         </div>
       </div>
 

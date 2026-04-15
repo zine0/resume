@@ -28,8 +28,21 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Icon } from '@iconify/react'
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd'
-import type { DraggableProvidedDragHandleProps } from '@hello-pangea/dnd'
+import {
+  closestCenter,
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { PersonalInfoItem, PersonalInfoSection, PersonalInfoLayout } from '@/types/resume'
 import { createPersonalInfoItem } from '@/lib/storage'
 import { useToast } from '@/hooks/use-toast'
@@ -39,6 +52,13 @@ interface PersonalInfoEditorProps {
   personalInfoSection: PersonalInfoSection
   avatar?: string
   onUpdate: (personalInfoSection: PersonalInfoSection, avatar?: string) => void
+}
+
+type SortableHandleProps = Pick<ReturnType<typeof useSortable>, 'attributes' | 'listeners'>
+
+function buildInlineSvgDataUrl(icon?: string) {
+  if (!icon) return ''
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${icon}</svg>`)}`
 }
 
 /**
@@ -61,29 +81,36 @@ export default function PersonalInfoEditor({
     : personalInfoSection?.avatarShape === 'square'
       ? 'square'
       : 'circle'
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+  )
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // 提取personalInfo到局部变量以简化代码，如果personalInfoSection不存在则使用空数组
   const personalInfo = personalInfoSection?.personalInfo || []
+  const sortedPersonalInfo = [...personalInfo].sort((a, b) => a.order - b.order)
 
   /**
    * 处理拖拽排序结束事件
    */
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination) return
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
 
-    const source = result.source
-    const destination = result.destination
+    if (!over || active.id === over.id) return
 
-    if (source.index === destination.index) return
+    const sourceIndex = sortedPersonalInfo.findIndex((item) => item.id === active.id)
+    const destinationIndex = sortedPersonalInfo.findIndex((item) => item.id === over.id)
 
-    const sortedPersonalInfo = [...personalInfo].sort((a, b) => a.order - b.order)
+    if (sourceIndex < 0 || destinationIndex < 0 || sourceIndex === destinationIndex) return
 
-    const [movedItem] = sortedPersonalInfo.splice(source.index, 1)
-    sortedPersonalInfo.splice(destination.index, 0, movedItem)
+    const reorderedPersonalInfo = arrayMove(sortedPersonalInfo, sourceIndex, destinationIndex)
 
     // 更新order字段
-    const updatedPersonalInfo = sortedPersonalInfo.map((item, index) => ({
+    const updatedPersonalInfo = reorderedPersonalInfo.map((item, index) => ({
       ...item,
       order: index,
     }))
@@ -394,7 +421,8 @@ export default function PersonalInfoEditor({
         <div className="form-group">
           <Label className="form-label">头像</Label>
           <div className="flex items-center gap-4">
-            <div
+            <button
+              type="button"
               className={`border-border hover:border-primary flex h-16 w-16 items-center justify-center overflow-hidden border-2 border-dashed hover:cursor-pointer ${avatarShape === 'square' ? 'rounded-none' : 'rounded-full'}`}
               onClick={() => fileInputRef.current?.click()}
             >
@@ -403,7 +431,7 @@ export default function PersonalInfoEditor({
               ) : (
                 <Icon icon="mdi:account" className="text-muted-foreground h-8 w-8" />
               )}
-            </div>
+            </button>
             <div className="flex-1">
               <Input
                 value={avatarUrl}
@@ -421,38 +449,23 @@ export default function PersonalInfoEditor({
         </div>
 
         {/* 个人信息项列表 */}
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="personal-info-list">
-            {(provided) => (
-              <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-3">
-                {personalInfo
-                  .sort((a, b) => a.order - b.order)
-                  .map((item, index) => (
-                    <Draggable key={item.id} draggableId={item.id} index={index}>
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          className={snapshot.isDragging ? 'opacity-50' : ''}
-                        >
-                          <div className="flex-1">
-                            <PersonalInfoItemEditor
-                              item={item}
-                              onUpdate={(updates) => updatePersonalInfoItem(item.id, updates)}
-                              onRemove={() => removePersonalInfoItem(item.id)}
-                              dragHandleProps={provided.dragHandleProps}
-                              isDragging={snapshot.isDragging}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </Draggable>
-                  ))}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={sortedPersonalInfo.map((item) => item.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-3">
+              {sortedPersonalInfo.map((item) => (
+                <SortablePersonalInfoItem
+                  key={item.id}
+                  item={item}
+                  onUpdate={(updates) => updatePersonalInfoItem(item.id, updates)}
+                  onRemove={() => removePersonalInfoItem(item.id)}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
 
         {personalInfo.length === 0 && (
           <div className="text-muted-foreground py-8 text-center">
@@ -472,6 +485,38 @@ export default function PersonalInfoEditor({
   )
 }
 
+interface SortablePersonalInfoItemProps {
+  item: PersonalInfoItem
+  onUpdate: (updates: Partial<PersonalInfoItem>) => void
+  onRemove: () => void
+}
+
+function SortablePersonalInfoItem({ item, onUpdate, onRemove }: SortablePersonalInfoItemProps) {
+  const { attributes, isDragging, listeners, setNodeRef, transform, transition } = useSortable({
+    id: item.id,
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+      }}
+      className="flex-1"
+    >
+      <PersonalInfoItemEditor
+        item={item}
+        onUpdate={onUpdate}
+        onRemove={onRemove}
+        dragHandleProps={{ attributes, listeners }}
+        isDragging={isDragging}
+      />
+    </div>
+  )
+}
+
 /**
  * 个人信息项编辑器
  */
@@ -479,7 +524,7 @@ interface PersonalInfoItemEditorProps {
   item: PersonalInfoItem
   onUpdate: (updates: Partial<PersonalInfoItem>) => void
   onRemove: () => void
-  dragHandleProps?: DraggableProvidedDragHandleProps | null
+  dragHandleProps?: SortableHandleProps | null
   isDragging?: boolean
 }
 
@@ -503,15 +548,9 @@ function PersonalInfoItemEditor({
             aria-label="选择图标"
             className="icon-button-personal-info flex h-8 w-8 flex-shrink-0 items-center justify-center bg-transparent p-0"
           >
-            {item.icon && (
-              <svg
-                width={16}
-                height={16}
-                viewBox="0 0 24 24"
-                className="text-muted-foreground"
-                dangerouslySetInnerHTML={{ __html: item.icon }}
-              />
-            )}
+            {item.icon ? (
+              <img src={buildInlineSvgDataUrl(item.icon)} alt="当前图标" className="h-4 w-4" />
+            ) : null}
           </Button>
         </DialogTrigger>
         <DialogContent>
@@ -603,14 +642,15 @@ function PersonalInfoItemEditor({
           </Button>
 
           {/* 拖拽手柄 */}
-          <div
-            {...dragHandleProps}
-            role="button"
+          <button
+            type="button"
+            {...(dragHandleProps?.attributes ?? {})}
+            {...(dragHandleProps?.listeners ?? {})}
             aria-label="拖拽排序"
             className={`text-muted-foreground hover:text-foreground flex h-8 w-8 flex-shrink-0 cursor-grab items-center justify-center rounded active:cursor-grabbing ${isDragging ? 'text-foreground' : ''}`}
           >
             <Icon icon="mdi:drag" className="h-4 w-4" />
-          </div>
+          </button>
         </div>
       </div>
 
