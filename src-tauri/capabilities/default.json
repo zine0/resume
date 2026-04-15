@@ -23,6 +23,7 @@
     "fs:allow-copy-file",
     "dialog:default",
     "dialog:allow-save",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "mcp-bridge:default"
   ]
 }

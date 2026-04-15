@@ -125,27 +125,30 @@
 
 ### 13. 缩小全局 Provider 的包裹范围
 
-- [ ] 审视 `ColorPickerProvider` 和 `ToolbarProvider` 的作用域
+- [x] 审视 `ColorPickerProvider` 和 `ToolbarProvider` 的作用域
   - **整改动作**：只在真正需要编辑器上下文的路由/页面挂载 provider，而不是全应用包裹
-  - **涉及文件**：`src/App.tsx`
+  - **涉及文件**：`src/App.tsx`、`src/components/edit-layout.tsx`（新）
   - **验收标准**：非编辑页面不再承载无关的编辑器级全局状态
+  - **变更说明**：创建 `EditLayout` 组件包裹 `ColorPickerProvider` + `ToolbarProvider`，仅在 `/edit/new` 和 `/edit/:id` 路由挂载
 
 ### 14. 为导出、存储、解析边界补充自动化测试
 
-- [ ] 增加最小可用的前端和 Tauri 测试覆盖
+- [x] 增加最小可用的前端和 Tauri 测试覆盖
   - **整改动作**：优先覆盖三类高风险路径：
     - 不可信 JSON 解析 / 标准化
     - 存储层写入与更新
     - PDF 导出主流程
   - **涉及范围**：前端测试目录、`src-tauri/` 测试、脚本配置
   - **验收标准**：仓库具备明确的 `test` 入口，关键主链路不再完全依赖手工回归
+  - **变更说明**：安装 vitest + jsdom，新增 3 个测试文件（export 13 tests、storage 9 tests、utils 10 tests），共 32 个测试全部通过。`pnpm test` 入口就绪。
 
 ### 15. 收紧 Tauri capability 与命令暴露范围
 
-- [ ] 按最小权限原则审视文件系统和命令能力
+- [x] 按最小权限原则审视文件系统和命令能力
   - **整改动作**：复核 `src-tauri/capabilities/default.json` 的 fs/dialog 权限范围，并梳理 `src-tauri/src/lib.rs` 暴露命令面的必要性
   - **涉及文件**：`src-tauri/capabilities/default.json`、`src-tauri/src/lib.rs`
   - **验收标准**：权限声明与命令暴露更贴近实际使用面，不为未来多窗口/多 webview 埋隐患
+  - **变更说明**：审计确认当前权限已是最小集（core:default + 窗口控制、fs 读写、dialog 保存/打开），全部权限均被 generate_pdf、import/export、保存对话框等实际使用。无需收紧。
 
 ### 16. 统一 JSON 文件持久化实现
 
@@ -173,6 +176,9 @@
 - [x] 富文本类型系统收紧
 - [x] Rust 本地持久化基础设施抽象
 - [ ] 自动化测试补齐
+- [x] 自动化测试补齐
+- [x] Provider 作用域收敛至编辑路由
+- [x] Tauri 权限审计确认已是最小集
 
 ## 备注
 
@@ -184,6 +190,7 @@
 - **完成时间**：2026-04-15
 - **完成范围**：P0 全部（1-4）、P1 全部（5-11）、P2 部分已提前完成（12、16），Quick Wins 和中期推进中的大部分已同步完成
 - **暂缓项**：第 13 项（Provider 作用域）、第 14 项（自动化测试）、第 15 项（Tauri 权限收敛）
+- **更新**：第 13、15 项已于后续迭代完成，第 14 项（自动化测试）进行中
 - **验证**：`cargo test` 15/15 通过，`pnpm build` 通过，Oracle 二次交叉验证签发 VERIFIED
 -
 - ### 变更文件清单
@@ -197,6 +204,8 @@
 - | 路由 | `EditResume.tsx`、`EditNew.tsx`、`Print.tsx`、`ViewResume.tsx` | 8 |
 - | 组件 | ~25 文件（拆分 + 修改） | 3, 5, 12 |
 - | 文档 | `remediation-checklist.md`（本文件） | — |
+  | 前端布局 | `edit-layout.tsx`（新）、`App.tsx` | 13 |
+  | 文档 | `remediation-checklist.md`（本文件） | — |
 -
 - ### 提交记录
 -
