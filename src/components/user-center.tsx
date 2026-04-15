@@ -823,12 +823,22 @@ export default function UserCenter() {
               {groupedFamilies.map((group) => (
                 <Fragment key={group.familyId}>
                   <TableRow className="bg-muted/20 hover:bg-muted/20">
-                    <TableCell colSpan={7} className="py-2">
+                    <TableCell colSpan={7} className="py-2.5">
                       <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary">家族</Badge>
-                          <span className="font-medium">{group.familyId.slice(0, 8)}</span>
-                          <span className="text-muted-foreground">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+                          <Badge variant="secondary" className="rounded-full px-2.5 py-0.5">
+                            家族
+                          </Badge>
+                          <div className="flex min-w-0 items-center gap-1.5 text-sm">
+                            <span className="text-muted-foreground">家族 ID</span>
+                            <span className="font-semibold tracking-tight">
+                              {group.familyId.slice(0, 8)}
+                            </span>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className="text-muted-foreground bg-background/70 rounded-full border-dashed px-2.5 py-0.5 font-normal"
+                          >
                             {(() => {
                               const totalCount =
                                 familySizes.get(group.familyId) ?? group.items.length
@@ -836,13 +846,13 @@ export default function UserCenter() {
                                 ? `共 ${totalCount} 份简历`
                                 : `显示 ${group.items.length} / 共 ${totalCount} 份简历`
                             })()}
-                          </span>
+                          </Badge>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
-                            className="h-7 gap-1.5 px-2 text-xs"
+                            className="bg-background/80 h-8 gap-1.5 rounded-full px-3 text-xs shadow-none"
                             onClick={() => handleCompareLatestTwo(group.familyId)}
                             disabled={(familySizes.get(group.familyId) ?? group.items.length) < 2}
                           >
