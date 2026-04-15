@@ -1299,21 +1299,9 @@ export default function UserCenter() {
                                 </div>
                               </div>
 
-                              {application.nextAction?.trim() ||
-                              application.followUpDate?.trim() ? (
+                              {application.nextAction?.trim() ? (
                                 <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                                  {application.nextAction?.trim() ? (
-                                    <span>下一步：{application.nextAction.trim()}</span>
-                                  ) : null}
-                                  {application.followUpDate?.trim() ? (
-                                    <span>
-                                      跟进：
-                                      {formatApplicationDate(application.followUpDate, {
-                                        month: 'numeric',
-                                        day: 'numeric',
-                                      })}
-                                    </span>
-                                  ) : null}
+                                  <span>下一步：{application.nextAction.trim()}</span>
                                 </div>
                               ) : null}
                             </div>

@@ -65,26 +65,6 @@ interface StatusMeta {
   emptyCopy: string
 }
 
-interface AttentionCue {
-  label: string
-  icon: string
-  tone: string
-  kind:
-    | 'overdue'
-    | 'today'
-    | 'upcoming'
-    | 'pending'
-    | 'completed'
-    | 'snoozed'
-    | 'waiting'
-    | 'blocked'
-    | 'active'
-}
-
-function isActionableReminderKind(kind: AttentionCue['kind']) {
-  return kind === 'overdue' || kind === 'today' || kind === 'upcoming' || kind === 'pending'
-}
-
 const STATUS_ORDER: ApplicationStatus[] = ['wishlist', 'applied', 'interview', 'offer', 'rejected']
 
 const STATUS_META: Record<ApplicationStatus, StatusMeta> = {
@@ -140,11 +120,8 @@ function toInput(application: ApplicationEntry): ApplicationInput {
     contactChannel: application.contactChannel,
     lastContactAt: application.lastContactAt,
     nextAction: application.nextAction,
-    followUpDate: application.followUpDate,
-    reminderStatus: application.reminderStatus,
     interviewStage: application.interviewStage,
     interviewRound: application.interviewRound,
-    reviewStatus: application.reviewStatus,
     blockedReason: application.blockedReason,
     result: application.result,
     notes: application.notes,
@@ -166,147 +143,19 @@ function formatDateLabel(value: string) {
   })
 }
 
-function parseLooseDate(value?: string) {
-  const normalized = value?.trim()
-  if (!normalized) {
-    return null
-  }
-
-  const timestamp = Date.parse(normalized)
-  if (Number.isNaN(timestamp)) {
-    return null
-  }
-
-  return new Date(timestamp)
-}
-
 function formatLooseDate(value?: string, options?: Intl.DateTimeFormatOptions) {
   const normalized = value?.trim()
   if (!normalized) {
     return ''
   }
 
-  const parsed = parseLooseDate(normalized)
+  const timestamp = Date.parse(normalized)
+  const parsed = Number.isNaN(timestamp) ? null : new Date(timestamp)
   if (!parsed) {
     return normalized
   }
 
   return parsed.toLocaleString('zh-CN', options)
-}
-
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
-function getReminderCue(application: ApplicationEntry, today = new Date()): AttentionCue | null {
-  const followUpDate = application.followUpDate?.trim()
-  const reminderStatus = application.reminderStatus
-
-  if (reminderStatus === 'completed') {
-    return {
-      kind: 'completed',
-      icon: 'mdi:check-circle-outline',
-      label: followUpDate
-        ? `跟进已完成 · ${formatLooseDate(followUpDate, { month: 'numeric', day: 'numeric' })}`
-        : '跟进已完成',
-      tone: 'border-border bg-muted/50 text-muted-foreground',
-    }
-  }
-
-  if (reminderStatus === 'snoozed') {
-    return {
-      kind: 'snoozed',
-      icon: 'mdi:bell-sleep-outline',
-      label: followUpDate
-        ? `提醒暂缓 · ${formatLooseDate(followUpDate, { month: 'numeric', day: 'numeric' })}`
-        : '提醒暂缓',
-      tone: 'border-border bg-muted/50 text-muted-foreground',
-    }
-  }
-
-  if (!followUpDate) {
-    return application.nextAction?.trim()
-      ? {
-          kind: 'pending',
-          icon: 'mdi:arrow-right-circle-outline',
-          label: '待执行动作',
-          tone: 'border-primary/15 bg-primary/5 text-primary',
-        }
-      : null
-  }
-
-  const parsedDate = parseLooseDate(followUpDate)
-  if (!parsedDate) {
-    return {
-      kind: 'pending',
-      icon: 'mdi:bell-outline',
-      label: `待跟进 · ${followUpDate}`,
-      tone: 'border-primary/15 bg-primary/5 text-primary',
-    }
-  }
-
-  const followUpDay = startOfDay(parsedDate).getTime()
-  const todayStart = startOfDay(today).getTime()
-
-  if (followUpDay < todayStart) {
-    return {
-      kind: 'overdue',
-      icon: 'mdi:bell-alert-outline',
-      label: `逾期跟进 · ${formatLooseDate(followUpDate, { month: 'numeric', day: 'numeric' })}`,
-      tone: 'border-destructive/20 bg-destructive/8 text-destructive',
-    }
-  }
-
-  if (followUpDay === todayStart) {
-    return {
-      kind: 'today',
-      icon: 'mdi:calendar-clock-outline',
-      label: '今天要跟进',
-      tone: 'border-chart-2/20 bg-chart-2/10 text-chart-2',
-    }
-  }
-
-  return {
-    kind: 'upcoming',
-    icon: 'mdi:calendar-arrow-right-outline',
-    label: `下次跟进 · ${formatLooseDate(followUpDate, { month: 'numeric', day: 'numeric' })}`,
-    tone: 'border-border bg-muted/50 text-muted-foreground',
-  }
-}
-
-function getReviewCue(application: ApplicationEntry): AttentionCue | null {
-  const blockedReason = application.blockedReason?.trim()
-
-  if (application.reviewStatus === 'blocked' || blockedReason) {
-    return {
-      kind: 'blocked',
-      icon: 'mdi:alert-octagon-outline',
-      label: blockedReason ? '流程阻塞，待处理原因' : '流程阻塞',
-      tone: 'border-destructive/20 bg-destructive/8 text-destructive',
-    }
-  }
-
-  if (application.reviewStatus === 'waiting') {
-    return {
-      kind: 'waiting',
-      icon: 'mdi:timer-sand',
-      label: application.lastContactAt?.trim()
-        ? `等待反馈 · 最近联系 ${formatLooseDate(application.lastContactAt, { month: 'numeric', day: 'numeric' })}`
-        : '等待反馈',
-      tone: 'border-chart-3/20 bg-chart-3/10 text-chart-3',
-    }
-  }
-
-  if (application.reviewStatus === 'active') {
-    return {
-      kind: 'active',
-      icon: 'mdi:progress-check',
-      label: '流程推进中',
-      tone: 'border-primary/15 bg-primary/5 text-primary',
-    }
-  }
-
-  return null
 }
 
 function isApplicationStatus(value: string): value is ApplicationStatus {
@@ -431,7 +280,6 @@ export default function ApplicationBoard() {
         application.resumeTitle,
         application.url,
         application.nextAction,
-        application.followUpDate,
         application.interviewStage,
         application.interviewRound,
         application.notes,
@@ -457,57 +305,6 @@ export default function ApplicationBoard() {
         rejected: [],
       } as Record<ApplicationStatus, ApplicationEntry[]>,
     )
-  }, [filteredApplications])
-
-  const summaryCards = useMemo(() => {
-    const today = new Date()
-    const visibleApplications = filteredApplications
-    const reminderKinds = visibleApplications.map(
-      (item) => getReminderCue(item, today)?.kind ?? null,
-    )
-    const overdueFollowUps = visibleApplications.filter(
-      (item) => getReminderCue(item, today)?.kind === 'overdue',
-    ).length
-    const actionableItems = reminderKinds.filter(
-      (kind): kind is AttentionCue['kind'] => kind !== null && isActionableReminderKind(kind),
-    ).length
-    const waitingFeedback = visibleApplications.filter(
-      (item) => getReviewCue(item)?.kind === 'waiting',
-    ).length
-    const blockedItems = visibleApplications.filter(
-      (item) => getReviewCue(item)?.kind === 'blocked',
-    ).length
-
-    return [
-      {
-        label: '逾期跟进',
-        value: overdueFollowUps,
-        description: overdueFollowUps > 0 ? '优先催进度或补动作' : '当前没有逾期事项',
-        icon: 'mdi:bell-alert-outline',
-        tone: 'bg-destructive/8 border-destructive/15 text-destructive',
-      },
-      {
-        label: '待处理动作',
-        value: actionableItems,
-        description: actionableItems > 0 ? '含今日、即将到期与待补动作' : '当前没有待处理动作',
-        icon: 'mdi:clipboard-check-outline',
-        tone: 'bg-chart-2/10 border-chart-2/20 text-chart-2',
-      },
-      {
-        label: '等待反馈',
-        value: waitingFeedback,
-        description: waitingFeedback > 0 ? '可查看最近联系并安排催问' : '当前没有待回复记录',
-        icon: 'mdi:timer-sand',
-        tone: 'bg-chart-3/10 border-chart-3/18 text-chart-3',
-      },
-      {
-        label: '阻塞中',
-        value: blockedItems,
-        description: blockedItems > 0 ? '先处理原因再继续推进' : '当前没有阻塞记录',
-        icon: 'mdi:alert-octagon-outline',
-        tone: 'bg-primary/5 border-primary/15 text-primary',
-      },
-    ]
   }, [filteredApplications])
 
   const handleSubmit = async (values: ApplicationInput) => {
@@ -714,10 +511,6 @@ export default function ApplicationBoard() {
     onDelete,
     onTailor,
   }: RenderApplicationCardArgs) => {
-    const reminderCue = getReminderCue(application)
-    const actionReminderCue =
-      reminderCue && isActionableReminderKind(reminderCue.kind) ? reminderCue : null
-    const reviewCue = getReviewCue(application)
     const blockedReason = application.blockedReason?.trim()
     const sourceLabel = application.source?.trim()
     const resultLabel = application.result?.trim()
@@ -802,18 +595,6 @@ export default function ApplicationBoard() {
             {application.appliedAt ? (
               <Badge variant="outline">投递于 {application.appliedAt}</Badge>
             ) : null}
-            {reminderCue ? (
-              <Badge variant="outline" className={reminderCue.tone}>
-                <Icon icon={reminderCue.icon} className="h-3 w-3" />
-                {reminderCue.label}
-              </Badge>
-            ) : null}
-            {reviewCue ? (
-              <Badge variant="outline" className={reviewCue.tone}>
-                <Icon icon={reviewCue.icon} className="h-3 w-3" />
-                {reviewCue.label}
-              </Badge>
-            ) : null}
             {application.status === 'interview' && application.interviewStage ? (
               <Badge variant="outline">阶段 {application.interviewStage}</Badge>
             ) : null}
@@ -834,23 +615,18 @@ export default function ApplicationBoard() {
             </div>
           ) : null}
 
-          {application.nextAction || actionReminderCue ? (
+          {application.nextAction ? (
             <div
               className={cn(
                 'rounded-lg border px-3 py-2 text-sm',
-                actionReminderCue?.tone ?? 'border-primary/15 bg-primary/5 text-primary',
+                'border-primary/15 bg-primary/5 text-primary',
               )}
             >
               <div className="flex items-start gap-2">
-                <Icon
-                  icon={actionReminderCue?.icon ?? 'mdi:arrow-right-circle-outline'}
-                  className="mt-0.5 h-4 w-4 shrink-0"
-                />
+                <Icon icon="mdi:arrow-right-circle-outline" className="mt-0.5 h-4 w-4 shrink-0" />
                 <div className="space-y-1">
-                  <p className="font-medium">{actionReminderCue?.label ?? '下一步动作'}</p>
-                  {application.nextAction ? (
-                    <p className="text-foreground/80">下一步：{application.nextAction}</p>
-                  ) : null}
+                  <p className="font-medium">下一步动作</p>
+                  <p className="text-foreground/80">下一步：{application.nextAction}</p>
                 </div>
               </div>
             </div>
@@ -990,21 +766,6 @@ export default function ApplicationBoard() {
                 新增记录
               </Button>
             </div>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {summaryCards.map((card) => (
-              <Card key={card.label} className={cn('gap-3 p-4', card.tone)}>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{card.label}</span>
-                  <Icon icon={card.icon} className="h-5 w-5" />
-                </div>
-                <div className="space-y-1">
-                  <div className="text-2xl font-semibold">{card.value}</div>
-                  <p className="text-xs leading-relaxed opacity-80">{card.description}</p>
-                </div>
-              </Card>
-            ))}
           </div>
         </div>
       </div>
