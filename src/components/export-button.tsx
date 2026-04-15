@@ -2,6 +2,13 @@ import React, { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Icon } from '@iconify/react'
 import type { ResumeData } from '@/types/resume'
+import {
+  generatePdfViaTauri,
+  getPdfExportErrorMessage,
+  saveDataUrlWithDialog,
+  saveGeneratedPdfWithDialog,
+  saveTextWithDialog,
+} from '@/lib/export'
 import { generatePdfFilename, cn } from '@/lib/utils'
 import { exportResumeFile } from '@/lib/storage'
 import {
@@ -24,50 +31,6 @@ interface ExportButtonProps {
   className?: string
   showImageOptions?: boolean // 在没有预览面板时可关闭图片导出
   renderMode?: 'button' | 'submenu'
-}
-
-async function saveWithDialog(
-  dataUrl: string,
-  defaultName: string,
-  filters: { name: string; extensions: string[] }[],
-): Promise<boolean> {
-  const { save } = await import('@tauri-apps/plugin-dialog')
-  const dest = await save({ defaultPath: defaultName, filters })
-  if (!dest) return false
-
-  const base64Match = dataUrl.match(/^data:[^;]+;base64,(.+)$/)
-  if (!base64Match) throw new Error('Invalid data URL format')
-  const binaryStr = atob(base64Match[1])
-  const bytes = new Uint8Array(binaryStr.length)
-  for (let i = 0; i < binaryStr.length; i++) {
-    bytes[i] = binaryStr.charCodeAt(i)
-  }
-
-  const { writeFile } = await import('@tauri-apps/plugin-fs')
-  await writeFile(dest, bytes)
-  return true
-}
-
-async function saveTextWithDialog(
-  content: string,
-  defaultName: string,
-  filters: { name: string; extensions: string[] }[],
-): Promise<boolean> {
-  const { save } = await import('@tauri-apps/plugin-dialog')
-  const dest = await save({ defaultPath: defaultName, filters })
-  if (!dest) return false
-
-  const encoder = new TextEncoder()
-  const bytes = encoder.encode(content)
-
-  const { writeFile } = await import('@tauri-apps/plugin-fs')
-  await writeFile(dest, bytes)
-  return true
-}
-
-async function invokeTauriPdf(html: string, filename: string): Promise<string> {
-  const { invoke } = await import('@tauri-apps/api/core')
-  return invoke<string>('generate_pdf', { html, filename })
 }
 
 export function ExportButton({
@@ -182,7 +145,7 @@ export function ExportButton({
         }
 
         const defaultName = generatePdfFilename(resumeData.title).replace('.pdf', `.${format}`)
-        const saved = await saveWithDialog(dataUrl, defaultName, [
+        const saved = await saveDataUrlWithDialog(dataUrl, defaultName, [
           { name: format.toUpperCase(), extensions: [format] },
         ])
         if (!saved) return
@@ -226,7 +189,7 @@ export function ExportButton({
       } as HtmlToImageOptions)
 
       const defaultName = generatePdfFilename(resumeData.title).replace('.pdf', '.svg')
-      const saved = await saveWithDialog(dataUrl, defaultName, [
+      const saved = await saveDataUrlWithDialog(dataUrl, defaultName, [
         { name: 'SVG', extensions: ['svg'] },
       ])
       if (!saved) return
@@ -356,22 +319,14 @@ export function ExportButton({
       const html = await resumeDataToHtml(normalized)
       const filename = generatePdfFilename(normalized.title || '')
 
-      const pdfPath = await invokeTauriPdf(html, filename)
-
-      const { save } = await import('@tauri-apps/plugin-dialog')
-      const dest = await save({
-        defaultPath: pdfPath.split('/').pop() || filename,
-        filters: [{ name: 'PDF', extensions: ['pdf'] }],
-      })
-      if (!dest) return
-
-      const { copyFile } = await import('@tauri-apps/plugin-fs')
-      await copyFile(pdfPath, dest)
+      const pdfPath = await generatePdfViaTauri(html, filename)
+      const saved = await saveGeneratedPdfWithDialog(pdfPath, filename)
+      if (!saved) return
 
       toast({ title: '导出成功', description: '简历已导出为 PDF 格式' })
     } catch (e) {
-      const msg = e instanceof Error ? e.message : JSON.stringify(e || {})
-      console.error('导出 PDF 失败:', msg)
+      const msg = getPdfExportErrorMessage(e)
+      console.error('导出 PDF 失败:', e)
       toast({
         title: '导出失败',
         description: `导出 PDF 时发生错误：${msg}`,

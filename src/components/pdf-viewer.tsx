@@ -1,6 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  generatePdfViaTauri,
+  getPdfExportErrorMessage,
+  saveGeneratedPdfWithDialog,
+} from '@/lib/export'
 import type { ResumeData } from '@/types/resume'
 import { generatePdfFilename } from '@/lib/utils'
+import { useToast } from '@/hooks/use-toast'
 import ResumePreview from './resume-preview'
 import PdfLoading from '@/components/pdf-loading'
 
@@ -157,11 +163,6 @@ ${previewHtml}
 </html>`
 }
 
-async function invokeTauriPdf(html: string, filename: string): Promise<string> {
-  const { invoke } = await import('@tauri-apps/api/core')
-  return invoke<string>('generate_pdf', { html, filename })
-}
-
 export function PDFViewer({
   resumeData,
   onModeChange,
@@ -189,7 +190,7 @@ export function PDFViewer({
         const html = await resumeDataToHtml(parsed)
         const filename = generatePdfFilename(parsed.title || '')
 
-        const pdfPath = await invokeTauriPdf(html, filename)
+        const pdfPath = await generatePdfViaTauri(html, filename)
         if (!mounted || genIdRef.current !== currentId) return
 
         setPdfUrl(pdfPath)
@@ -198,7 +199,7 @@ export function PDFViewer({
       } catch (e) {
         console.error('Tauri PDF failed, falling back to print:', e)
         if (!mounted || genIdRef.current !== currentId) return
-        setError(e instanceof Error ? e.message : String(e))
+        setError(getPdfExportErrorMessage(e))
         setMode('fallback')
         onModeChange?.('fallback')
       }
@@ -210,7 +211,7 @@ export function PDFViewer({
       if (urlToRevoke) URL.revokeObjectURL(urlToRevoke)
       clearTimeout(t)
     }
-  }, [resumeKey, onModeChange, renderNotice])
+  }, [resumeKey, onModeChange])
 
   if (mode === 'server') {
     if (renderNotice === 'external') {
@@ -244,6 +245,7 @@ export function PDFViewer({
               请在打印对话框中：关闭"页眉和页脚"，勾选"背景图形"。
             </span>
             <button
+              type="button"
               onClick={() => window.print()}
               className="bg-primary text-primary-foreground ml-3 inline-flex items-center rounded px-3 py-1.5 text-sm"
             >
@@ -269,6 +271,7 @@ export function PDFDownloadLink({
   children: React.ReactNode
 }) {
   const [loading, setLoading] = useState(false)
+  const { toast } = useToast()
 
   const handleClick = useCallback(
     async (e: React.MouseEvent) => {
@@ -278,23 +281,22 @@ export function PDFDownloadLink({
       const normalized = normalizeResumeDataForAvatar(resumeData)
       try {
         const html = await resumeDataToHtml(normalized)
-        const pdfPath = await invokeTauriPdf(html, fileName)
-        const { save } = await import('@tauri-apps/plugin-dialog')
-        const dest = await save({
-          defaultPath: pdfPath.split('/').pop() || fileName,
-          filters: [{ name: 'PDF', extensions: ['pdf'] }],
-        })
-        if (!dest) return
-        const { copyFile } = await import('@tauri-apps/plugin-fs')
-        await copyFile(pdfPath, dest)
+        const pdfPath = await generatePdfViaTauri(html, fileName)
+        const saved = await saveGeneratedPdfWithDialog(pdfPath, fileName)
+        if (!saved) return
       } catch (e) {
         console.error(e)
-        alert('生成 PDF 失败，请稍后再试。')
+        const description = getPdfExportErrorMessage(e)
+        toast({
+          title: '生成 PDF 失败',
+          description,
+          variant: 'destructive',
+        })
       } finally {
         setLoading(false)
       }
     },
-    [resumeData, fileName, loading],
+    [resumeData, fileName, loading, toast],
   )
 
   if (React.isValidElement(children)) {
@@ -308,9 +310,9 @@ export function PDFDownloadLink({
     })
   }
   return (
-    <a href="#" onClick={handleClick}>
+    <button type="button" onClick={handleClick}>
       {loading ? '正在生成 PDF...' : children || '下载 PDF'}
-    </a>
+    </button>
   )
 }
 
