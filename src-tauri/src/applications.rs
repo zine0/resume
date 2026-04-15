@@ -1,8 +1,6 @@
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use std::fs;
 use std::path::PathBuf;
-use tauri::Manager;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -128,9 +126,7 @@ struct ApplicationStorageData {
 }
 
 fn data_dir(app: &tauri::AppHandle) -> PathBuf {
-    app.path()
-        .app_data_dir()
-        .expect("failed to resolve app data dir")
+    crate::persist::app_data_dir(app)
 }
 
 fn storage_file(app: &tauri::AppHandle) -> PathBuf {
@@ -139,19 +135,13 @@ fn storage_file(app: &tauri::AppHandle) -> PathBuf {
 
 fn read_storage(app: &tauri::AppHandle) -> Result<ApplicationStorageData, String> {
     let path = storage_file(app);
-    if !path.exists() {
-        return Ok(ApplicationStorageData { entries: vec![] });
-    }
-
-    let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
-    serde_json::from_str::<ApplicationStorageData>(&content)
+    crate::persist::read_json_or(&path, ApplicationStorageData { entries: vec![] })
         .map_err(|_| "读取求职记录失败：存储文件格式无法识别，请先备份当前数据文件。".to_string())
 }
 
 fn write_storage(app: &tauri::AppHandle, data: &ApplicationStorageData) -> Result<(), String> {
     let path = storage_file(app);
-    let json = serde_json::to_string_pretty(data).map_err(|e| e.to_string())?;
-    fs::write(path, json).map_err(|e| e.to_string())
+    crate::persist::write_json_atomic(&path, data)
 }
 
 fn sanitize_optional_text(value: Option<String>) -> Option<String> {

@@ -6,6 +6,7 @@ mod ai_service;
 mod ai_snapshot;
 mod applications;
 mod pdf;
+mod persist;
 mod resume;
 mod storage;
 
@@ -14,6 +15,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(storage::ResumeStorageLock::default())
         .invoke_handler(tauri::generate_handler![
             ai_service::ai_polish_text,
             ai_service::ai_optimize_resume,
