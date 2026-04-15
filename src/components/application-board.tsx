@@ -1,47 +1,24 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  type ReactNode,
-  type RefObject,
-  useRef,
-  useState,
-  type CSSProperties,
-  type RefCallback,
-} from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Icon } from '@iconify/react'
 import {
   closestCorners,
-  DndContext,
-  DragOverlay,
   PointerSensor,
-  useDraggable,
-  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { AISettingsDialog } from '@/components/ai-settings-dialog'
+import { ApplicationBoardDeleteDialog } from '@/components/application-board-delete-dialog'
+import { ApplicationBoardEmptyState } from '@/components/application-board-empty-state'
+import { ApplicationBoardHeader } from '@/components/application-board-header'
+import { ApplicationBoardKanban } from '@/components/application-board-kanban'
+import { ApplicationBoardNoResults } from '@/components/application-board-no-results'
+import type { RenderApplicationCardArgs, StatusMeta } from '@/components/application-board-types'
 import { useToast } from '@/hooks/use-toast'
 import JobApplicationDialog from '@/components/job-application-dialog'
+import { ApplicationCard } from '@/components/application-card'
 import { aiAnalyzeJD, applyAiPatchToResumeData, JD_SUGGESTION_MODULE_TITLE } from '@/lib/ai-service'
 import { getResumeDisplayTitle, getResumeVariantLabel } from '@/lib/resume-lineage'
 import {
@@ -53,17 +30,8 @@ import {
   getResumeById,
   updateApplication,
 } from '@/lib/storage'
-import { cn } from '@/lib/utils'
 import type { ApplicationEntry, ApplicationInput, ApplicationStatus } from '@/types/application'
 import type { StoredResume } from '@/types/resume'
-
-interface StatusMeta {
-  label: string
-  icon: string
-  surfaceClass: string
-  badgeClass: string
-  emptyCopy: string
-}
 
 const STATUS_ORDER: ApplicationStatus[] = ['wishlist', 'applied', 'interview', 'offer', 'rejected']
 
@@ -160,24 +128,6 @@ function formatLooseDate(value?: string, options?: Intl.DateTimeFormatOptions) {
 
 function isApplicationStatus(value: string): value is ApplicationStatus {
   return STATUS_ORDER.includes(value as ApplicationStatus)
-}
-
-function noopRef() {}
-
-interface RenderApplicationCardArgs {
-  application: ApplicationEntry
-  linkedResumeTitle?: string
-  tailoring: boolean
-  isDragging: boolean
-  fixedWidth?: number
-  style?: CSSProperties
-  setRef: RefCallback<HTMLDivElement>
-  dragHandle?: ReactNode
-  previewOnly?: boolean
-  movingId: string | null
-  onEdit: (application: ApplicationEntry) => void
-  onDelete: (application: ApplicationEntry) => void
-  onTailor: (application: ApplicationEntry) => Promise<void>
 }
 
 export default function ApplicationBoard() {
@@ -511,174 +461,30 @@ export default function ApplicationBoard() {
     onDelete,
     onTailor,
   }: RenderApplicationCardArgs) => {
-    const blockedReason = application.blockedReason?.trim()
-    const sourceLabel = application.source?.trim()
-    const resultLabel = application.result?.trim()
-    const lastContactLabel = application.lastContactAt?.trim()
+    const resumeVariantLabel =
+      application.resumeId && resumeMap.get(application.resumeId)
+        ? getResumeVariantLabel(resumeMap.get(application.resumeId)!.lineage.variantKind)
+        : undefined
 
     return (
-      <div
-        ref={setRef}
-        style={{
-          ...style,
-          ...(fixedWidth ? { width: fixedWidth } : {}),
-          ...(isDragging ? { zIndex: 1100 } : {}),
-        }}
-        className={cn('whitespace-normal transition-transform', isDragging && 'rotate-[1deg]')}
-      >
-        <Card
-          className={cn(
-            'gap-3 p-4',
-            currentMovingId === application.id && 'opacity-70',
-            isDragging && 'shadow-2xl',
-            previewOnly && 'pointer-events-none',
-          )}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-2">
-              {dragHandle ? <div className="shrink-0">{dragHandle}</div> : null}
-              <div className="space-y-1">
-                <p className="text-base leading-tight font-semibold">{application.company}</p>
-                <p className="text-muted-foreground text-sm">{application.role}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              {application.url ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  onClick={() => window.open(application.url, '_blank', 'noopener,noreferrer')}
-                  disabled={previewOnly}
-                >
-                  <Icon icon="mdi:open-in-new" className="h-4 w-4" />
-                </Button>
-              ) : null}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                onClick={() => onEdit(application)}
-                disabled={previewOnly}
-              >
-                <Icon icon="mdi:pencil-outline" className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:bg-destructive size-8 hover:text-white"
-                onClick={() => onDelete(application)}
-                disabled={previewOnly}
-              >
-                <Icon icon="mdi:trash-can-outline" className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {linkedResumeTitle ? (
-              <Badge
-                variant="outline"
-                className="border-primary/20 bg-primary/5 text-primary max-w-full min-w-0 gap-1 overflow-hidden"
-              >
-                <span className="shrink-0">简历 ·</span>
-                <span className="min-w-0 truncate">{linkedResumeTitle}</span>
-              </Badge>
-            ) : null}
-            {application.resumeId && resumeMap.get(application.resumeId) ? (
-              <Badge variant="outline">
-                {getResumeVariantLabel(resumeMap.get(application.resumeId)!.lineage.variantKind)}
-              </Badge>
-            ) : null}
-            {sourceLabel ? <Badge variant="outline">来源 {sourceLabel}</Badge> : null}
-            {resultLabel ? <Badge variant="outline">结果 {resultLabel}</Badge> : null}
-            {application.appliedAt ? (
-              <Badge variant="outline">投递于 {application.appliedAt}</Badge>
-            ) : null}
-            {application.status === 'interview' && application.interviewStage ? (
-              <Badge variant="outline">阶段 {application.interviewStage}</Badge>
-            ) : null}
-            {application.status === 'interview' && application.interviewRound ? (
-              <Badge variant="outline">轮次 {application.interviewRound}</Badge>
-            ) : null}
-          </div>
-
-          {blockedReason ? (
-            <div className="bg-destructive/8 border-destructive/15 rounded-lg border px-3 py-2 text-sm">
-              <div className="text-destructive flex items-start gap-2">
-                <Icon icon="mdi:alert-octagon-outline" className="mt-0.5 h-4 w-4 shrink-0" />
-                <div className="space-y-1">
-                  <p className="font-medium">阻塞原因</p>
-                  <p className="text-foreground/80">{blockedReason}</p>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {application.nextAction ? (
-            <div
-              className={cn(
-                'rounded-lg border px-3 py-2 text-sm',
-                'border-primary/15 bg-primary/5 text-primary',
-              )}
-            >
-              <div className="flex items-start gap-2">
-                <Icon icon="mdi:arrow-right-circle-outline" className="mt-0.5 h-4 w-4 shrink-0" />
-                <div className="space-y-1">
-                  <p className="font-medium">下一步动作</p>
-                  <p className="text-foreground/80">下一步：{application.nextAction}</p>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full gap-2 bg-transparent"
-            disabled={tailoring || previewOnly}
-            onClick={() => void onTailor(application)}
-          >
-            {tailoring ? (
-              <>
-                <Icon icon="lucide:loader-2" className="h-4 w-4 animate-spin" />
-                定制中...
-              </>
-            ) : (
-              <>
-                <Icon icon="mdi:sparkles" className="h-4 w-4" />
-                JD 定制简历
-              </>
-            )}
-          </Button>
-
-          {application.jdText ? (
-            <div className="bg-muted/40 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
-              <p className="line-clamp-4">JD：{application.jdText}</p>
-            </div>
-          ) : null}
-
-          {application.notes ? (
-            <div className="bg-muted/40 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
-              <p className="line-clamp-4">备注：{application.notes}</p>
-            </div>
-          ) : null}
-
-          <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span>
-              {lastContactLabel
-                ? `最近联系 ${formatLooseDate(lastContactLabel, {
-                    month: 'numeric',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}`
-                : '最近暂无联系记录'}
-            </span>
-            <span>最近更新 {formatDateLabel(application.updatedAt)}</span>
-          </div>
-        </Card>
-      </div>
+      <ApplicationCard
+        application={application}
+        linkedResumeTitle={linkedResumeTitle}
+        resumeVariantLabel={resumeVariantLabel}
+        tailoring={tailoring}
+        isDragging={isDragging}
+        fixedWidth={fixedWidth}
+        style={style}
+        setRef={setRef}
+        dragHandle={dragHandle}
+        previewOnly={previewOnly}
+        movingId={currentMovingId}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onTailor={onTailor}
+        formatLooseDate={formatLooseDate}
+        formatDateLabel={formatDateLabel}
+      />
     )
   }
 
@@ -709,180 +515,55 @@ export default function ApplicationBoard() {
 
   return (
     <div className="bg-background min-h-screen">
-      <div className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-20 border-b backdrop-blur">
-        <div className="flex flex-col gap-4 px-4 py-4 lg:px-6">
-          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate('/resumes')}
-                  className="gap-2 bg-transparent"
-                >
-                  <Icon icon="mdi:file-document-multiple-outline" className="h-4 w-4" />
-                  简历库
-                </Button>
-                <Separator orientation="vertical" className="hidden h-6 md:block" />
-                <div className="flex items-center gap-2">
-                  <Icon icon="mdi:view-kanban-outline" className="text-primary h-6 w-6" />
-                  <h1 className="text-lg font-semibold">求职看板</h1>
-                  <Badge variant="secondary">{applications.length}</Badge>
-                </div>
-              </div>
-              <p className="text-muted-foreground text-sm">
-                把岗位、投递进度和结果放在同一块看板里统一推进，需要时再进入简历库管理版本。
-              </p>
-              {resumeLoadFailed ? (
-                <p className="text-destructive text-sm">
-                  简历库加载失败，当前仍可继续管理求职记录。
-                </p>
-              ) : null}
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <Input
-                value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
-                placeholder="搜索公司、岗位、下一步动作、JD 或备注..."
-                className="w-full sm:w-72"
-              />
-              <Button
-                variant="outline"
-                onClick={() => setAiSettingsOpen(true)}
-                className="gap-2 bg-transparent"
-              >
-                <Icon icon="mdi:cog-outline" className="h-4 w-4" />
-                AI 设置
-              </Button>
-              <Button
-                onClick={() => {
-                  setEditingItem(null)
-                  setDialogOpen(true)
-                }}
-                className="gap-2"
-              >
-                <Icon icon="mdi:plus" className="h-4 w-4" />
-                新增记录
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ApplicationBoardHeader
+        applicationsCount={applications.length}
+        keyword={keyword}
+        resumeLoadFailed={resumeLoadFailed}
+        onKeywordChange={setKeyword}
+        onNavigateResumes={() => navigate('/resumes')}
+        onOpenAiSettings={() => setAiSettingsOpen(true)}
+        onCreate={() => {
+          setEditingItem(null)
+          setDialogOpen(true)
+        }}
+      />
 
       <div className="px-4 py-5 lg:px-6">
         {applications.length === 0 ? (
-          <Card className="bg-muted/30 mx-auto max-w-2xl gap-4 border-dashed p-10 text-center shadow-sm">
-            <div className="bg-primary/10 text-primary mx-auto flex h-16 w-16 items-center justify-center rounded-full">
-              <Icon icon="mdi:view-kanban-outline" className="h-8 w-8" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-xl font-semibold">还没有求职记录</h2>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                先创建第一条记录，把目标岗位放进看板；后续可直接拖拽到不同阶段，持续跟踪投递节奏。
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Button
-                onClick={() => {
-                  setEditingItem(null)
-                  setDialogOpen(true)
-                }}
-                className="gap-2"
-              >
-                <Icon icon="mdi:plus" className="h-4 w-4" />
-                新增第一条记录
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => navigate('/resumes')}
-                className="gap-2 bg-transparent"
-              >
-                <Icon icon="mdi:file-document-outline" className="h-4 w-4" />
-                前往简历库
-              </Button>
-            </div>
-          </Card>
+          <ApplicationBoardEmptyState
+            onCreate={() => {
+              setEditingItem(null)
+              setDialogOpen(true)
+            }}
+            onNavigateResumes={() => navigate('/resumes')}
+          />
         ) : filteredApplications.length === 0 ? (
-          <Card className="bg-muted/30 mx-auto max-w-xl gap-3 border-dashed p-8 text-center shadow-sm">
-            <div className="text-muted-foreground mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-dashed">
-              <Icon icon="mdi:magnify" className="h-7 w-7" />
-            </div>
-            <h2 className="text-lg font-semibold">没有匹配到记录</h2>
-            <p className="text-muted-foreground text-sm">
-              试试更换关键词，或直接新增一条新的求职记录。
-            </p>
-            <div className="flex justify-center">
-              <Button
-                variant="outline"
-                onClick={() => setKeyword('')}
-                className="gap-2 bg-transparent"
-              >
-                <Icon icon="mdi:close-circle-outline" className="h-4 w-4" />
-                清空搜索
-              </Button>
-            </div>
-          </Card>
+          <ApplicationBoardNoResults onClear={() => setKeyword('')} />
         ) : (
-          <div className="w-full overflow-visible">
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCorners}
-              onDragStart={handleDragStart}
-              onDragEnd={(event) => void handleDragEnd(event)}
-              onDragCancel={handleDragCancel}
-            >
-              <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] items-start gap-4 pb-4">
-                {STATUS_ORDER.map((status) => (
-                  <BoardColumn
-                    key={status}
-                    status={status}
-                    meta={STATUS_META[status]}
-                    items={groupedApplications[status]}
-                    movingId={movingId}
-                    resumeTitleMap={resumeTitleMap}
-                    tailoringIds={tailoringIds}
-                    cardWidthsRef={cardWidthsRef}
-                    renderApplicationCard={renderApplicationCard}
-                    onEdit={(application) => {
-                      setEditingItem(application)
-                      setDialogOpen(true)
-                    }}
-                    onDelete={setDeleteTarget}
-                    onTailor={handleCreateTailoredResume}
-                  />
-                ))}
-              </div>
-
-              <DragOverlay>
-                {activeApplication
-                  ? renderApplicationCard({
-                      application: activeApplication,
-                      linkedResumeTitle: activeLinkedResumeTitle,
-                      tailoring: tailoringIds.includes(activeApplication.id),
-                      isDragging: true,
-                      fixedWidth: activeApplicationWidth,
-                      setRef: noopRef,
-                      previewOnly: true,
-                      movingId,
-                      onEdit: () => {},
-                      onDelete: () => {},
-                      onTailor: async () => {},
-                      dragHandle: (
-                        <button
-                          type="button"
-                          className="text-muted-foreground inline-flex size-8 items-center justify-center rounded-md"
-                          aria-hidden="true"
-                          tabIndex={-1}
-                        >
-                          <Icon icon="mdi:drag" className="h-4 w-4" />
-                        </button>
-                      ),
-                    })
-                  : null}
-              </DragOverlay>
-            </DndContext>
-          </div>
+          <ApplicationBoardKanban
+            sensors={sensors}
+            collisionDetection={closestCorners}
+            statusOrder={STATUS_ORDER}
+            groupedApplications={groupedApplications}
+            statusMeta={STATUS_META}
+            movingId={movingId}
+            resumeTitleMap={resumeTitleMap}
+            tailoringIds={tailoringIds}
+            cardWidthsRef={cardWidthsRef}
+            renderApplicationCard={renderApplicationCard}
+            activeApplication={activeApplication}
+            activeLinkedResumeTitle={activeLinkedResumeTitle}
+            activeApplicationWidth={activeApplicationWidth}
+            onDragStart={handleDragStart}
+            onDragEnd={(event) => void handleDragEnd(event)}
+            onDragCancel={handleDragCancel}
+            onEdit={(application) => {
+              setEditingItem(application)
+              setDialogOpen(true)
+            }}
+            onDelete={setDeleteTarget}
+            onTailor={handleCreateTailoredResume}
+          />
         )}
       </div>
 
@@ -900,190 +581,14 @@ export default function ApplicationBoard() {
 
       <AISettingsDialog open={aiSettingsOpen} onOpenChange={setAiSettingsOpen} />
 
-      <AlertDialog
-        open={Boolean(deleteTarget)}
+      <ApplicationBoardDeleteDialog
+        target={deleteTarget}
+        deleting={deleting}
         onOpenChange={(open) => {
           if (!open) setDeleteTarget(null)
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>确认删除这条求职记录？</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget
-                ? `将删除「${deleteTarget.company} · ${deleteTarget.role}」，该操作无法撤销。`
-                : '该操作无法撤销。'}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={() => void handleDelete()} disabled={deleting}>
-              {deleting ? '删除中...' : '删除'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onConfirm={() => void handleDelete()}
+      />
     </div>
   )
-}
-
-interface BoardColumnProps {
-  status: ApplicationStatus
-  meta: StatusMeta
-  items: ApplicationEntry[]
-  movingId: string | null
-  resumeTitleMap: Map<string, string>
-  tailoringIds: string[]
-  cardWidthsRef: RefObject<Map<string, number>>
-  renderApplicationCard: (args: RenderApplicationCardArgs) => ReactNode
-  onEdit: (application: ApplicationEntry) => void
-  onDelete: (application: ApplicationEntry) => void
-  onTailor: (application: ApplicationEntry) => Promise<void>
-}
-
-function BoardColumn({
-  status,
-  meta,
-  items,
-  movingId,
-  resumeTitleMap,
-  tailoringIds,
-  cardWidthsRef,
-  renderApplicationCard,
-  onEdit,
-  onDelete,
-  onTailor,
-}: BoardColumnProps) {
-  const { isOver, setNodeRef } = useDroppable({
-    id: status,
-    data: { status },
-  })
-
-  return (
-    <Card className="h-full w-full min-w-0 gap-4 py-4">
-      <div className="flex items-center justify-between px-4">
-        <div className="flex items-center gap-2">
-          <div className={cn('rounded-lg border p-2', meta.surfaceClass)}>
-            <Icon icon={meta.icon} className="h-4 w-4" />
-          </div>
-          <div>
-            <h2 className="text-sm font-semibold">{meta.label}</h2>
-            <p className="text-muted-foreground text-xs">拖拽手柄即可变更状态</p>
-          </div>
-        </div>
-        <Badge variant="outline" className={meta.badgeClass}>
-          {items.length}
-        </Badge>
-      </div>
-
-      <div
-        ref={setNodeRef}
-        className={cn(
-          'relative mx-3 min-h-[380px] rounded-xl border border-dashed p-3 transition-colors',
-          meta.surfaceClass,
-          isOver && 'ring-ring/30 ring-2',
-        )}
-      >
-        {items.length === 0 ? (
-          <div className="text-muted-foreground pointer-events-none absolute inset-x-4 top-1/2 z-10 -translate-y-1/2 text-center text-sm leading-relaxed whitespace-normal">
-            {meta.emptyCopy}
-          </div>
-        ) : null}
-
-        <div className="space-y-3">
-          {items.map((application) => {
-            const tailoring = tailoringIds.includes(application.id)
-            const linkedResumeTitle =
-              application.resumeTitle ||
-              (application.resumeId ? resumeTitleMap.get(application.resumeId) : undefined)
-
-            return (
-              <BoardDraggableCard
-                key={application.id}
-                application={application}
-                linkedResumeTitle={linkedResumeTitle}
-                tailoring={tailoring}
-                movingId={movingId}
-                cardWidthsRef={cardWidthsRef}
-                renderApplicationCard={renderApplicationCard}
-                onEdit={onEdit}
-                onDelete={onDelete}
-                onTailor={onTailor}
-              />
-            )
-          })}
-        </div>
-      </div>
-    </Card>
-  )
-}
-
-interface BoardDraggableCardProps {
-  application: ApplicationEntry
-  linkedResumeTitle?: string
-  tailoring: boolean
-  movingId: string | null
-  cardWidthsRef: RefObject<Map<string, number>>
-  renderApplicationCard: (args: RenderApplicationCardArgs) => ReactNode
-  onEdit: (application: ApplicationEntry) => void
-  onDelete: (application: ApplicationEntry) => void
-  onTailor: (application: ApplicationEntry) => Promise<void>
-}
-
-function BoardDraggableCard({
-  application,
-  linkedResumeTitle,
-  tailoring,
-  movingId,
-  cardWidthsRef,
-  renderApplicationCard,
-  onEdit,
-  onDelete,
-  onTailor,
-}: BoardDraggableCardProps) {
-  const { attributes, isDragging, listeners, setNodeRef, transform } = useDraggable({
-    id: application.id,
-    data: {
-      status: application.status,
-    },
-  })
-
-  const setMeasuredRef: RefCallback<HTMLDivElement> = (node) => {
-    setNodeRef(node)
-    if (node) {
-      cardWidthsRef.current.set(application.id, node.getBoundingClientRect().width)
-    } else {
-      cardWidthsRef.current.delete(application.id)
-    }
-  }
-
-  return renderApplicationCard({
-    application,
-    linkedResumeTitle,
-    tailoring,
-    isDragging,
-    style: {
-      opacity: isDragging ? 0.12 : undefined,
-      transform: CSS.Translate.toString(transform),
-    },
-    setRef: setMeasuredRef,
-    movingId,
-    onEdit,
-    onDelete,
-    onTailor,
-    dragHandle: (
-      <button
-        type="button"
-        className={cn(
-          'text-muted-foreground hover:bg-muted inline-flex size-8 cursor-grab items-center justify-center rounded-md transition-colors active:cursor-grabbing',
-          isDragging && 'cursor-grabbing',
-        )}
-        aria-label="拖拽调整状态"
-        {...listeners}
-        {...attributes}
-      >
-        <Icon icon="mdi:drag" className="h-4 w-4" />
-      </button>
-    ),
-  })
 }

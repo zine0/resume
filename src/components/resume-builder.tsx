@@ -1,11 +1,7 @@
-import type React from 'react'
-
-import { useState, useEffect, useCallback, memo, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
-import { Badge } from '@/components/ui/badge'
 import { Icon } from '@iconify/react'
 import type { ResumeData, EditorState } from '@/types/resume'
 import type { AutoSaveStatus } from '@/hooks/use-auto-save'
@@ -15,50 +11,12 @@ import ResumePreview from './resume-preview'
 import PersonalInfoEditor from './personal-info-editor'
 import JobIntentionEditor from './job-intention-editor'
 import ModuleEditor from './module-editor'
-import ExportButton from './export-button'
 import JDAnalysisSheet from './jd-analysis-sheet'
 import FullResumeOptimizationDialog from './full-resume-optimization-dialog'
+import { ResumeBuilderToolbar } from './resume-builder-toolbar'
 import { useIsMobile } from '@/hooks/use-mobile'
 
 type ViewMode = 'both' | 'edit-only' | 'preview-only'
-
-const ViewModeSelector = memo(
-  ({
-    viewMode,
-    onViewModeChange,
-  }: {
-    viewMode: ViewMode
-    onViewModeChange: (mode: ViewMode) => void
-  }) => {
-    const modes = [
-      { key: 'both' as ViewMode, label: '编辑+预览', icon: 'mdi:view-split-vertical' },
-      { key: 'edit-only' as ViewMode, label: '仅编辑', icon: 'mdi:pencil' },
-      { key: 'preview-only' as ViewMode, label: '仅预览', icon: 'mdi:eye' },
-    ]
-
-    return (
-      <div className="bg-muted relative inline-flex rounded-lg p-1">
-        {modes.map((mode) => (
-          <button
-            key={mode.key}
-            type="button"
-            onClick={() => onViewModeChange(mode.key)}
-            className={`relative flex min-w-[100px] items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
-              viewMode === mode.key
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground'
-            } `}
-          >
-            <Icon icon={mode.icon} className="h-4 w-4" />
-            <span className="hidden sm:inline">{mode.label}</span>
-          </button>
-        ))}
-      </div>
-    )
-  },
-)
-
-ViewModeSelector.displayName = 'ViewModeSelector'
 
 /**
  * 简历构建器主组件
@@ -73,6 +31,7 @@ export default function ResumeBuilder({
   onCreateOptimizedResume,
   autoSaveStatus,
   autoSaveLastSaved,
+  autoSaveErrorMessage,
 }: {
   initialData?: ResumeData
   template?: 'default' | 'example'
@@ -83,6 +42,7 @@ export default function ResumeBuilder({
   onCreateOptimizedResume?: (data: ResumeData) => void | Promise<void>
   autoSaveStatus?: AutoSaveStatus
   autoSaveLastSaved?: string | null
+  autoSaveErrorMessage?: string | null
 }) {
   const [editorState, setEditorState] = useState<EditorState | null>(null)
 
@@ -167,97 +127,19 @@ export default function ResumeBuilder({
 
   return (
     <div className="resume-editor">
-      {/* 工具栏 */}
-      <div className="editor-toolbar no-print">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Icon icon="mdi:file-document-edit" className="text-primary h-6 w-6" />
-            <h1 className="text-lg font-semibold">简历编辑器</h1>
-          </div>
-          <Badge variant="secondary" className="text-xs">
-            {editorState.resumeData.title}
-          </Badge>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* 返回置于视图模式切换左侧 */}
-          {onBack ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onBack?.()}
-              className="gap-2 bg-transparent"
-            >
-              <Icon icon="mdi:arrow-left" className="h-4 w-4" />
-              返回
-            </Button>
-          ) : null}
-
-          <Separator orientation="vertical" className="h-6" />
-
-          <ViewModeSelector viewMode={viewMode} onViewModeChange={handleViewModeChange} />
-
-          {/* 保存 */}
-          {onSave ? (
-            <Button
-              size="sm"
-              onClick={() => onSave?.(editorState.resumeData)}
-              className="gap-2 bg-green-600 text-white hover:bg-green-700"
-            >
-              <Icon icon="mdi:content-save" className="h-4 w-4" />
-              保存
-            </Button>
-          ) : null}
-
-          {/* 自动保存状态 */}
-          {autoSaveStatus && autoSaveStatus !== 'idle' && (
-            <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
-              {autoSaveStatus === 'saving' && (
-                <>
-                  <Icon icon="mdi:loading" className="h-3 w-3 animate-spin" />
-                  保存中...
-                </>
-              )}
-              {autoSaveStatus === 'saved' && (
-                <>
-                  <Icon icon="mdi:check-circle" className="h-3 w-3 text-green-500" />
-                  已保存{autoSaveLastSaved ? ` ${autoSaveLastSaved}` : ''}
-                </>
-              )}
-              {autoSaveStatus === 'error' && (
-                <>
-                  <Icon icon="mdi:alert-circle" className="text-destructive h-3 w-3" />
-                  自动保存失败
-                </>
-              )}
-            </span>
-          )}
-
-          {/* 导出 */}
-          <ExportButton resumeData={editorState.resumeData} size="sm" />
-
-          <Separator orientation="vertical" className="h-6" />
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setFullOptimizeOpen(true)}
-            className="gap-2 bg-transparent"
-          >
-            <Icon icon="mdi:sparkles" className="h-4 w-4" />
-            一键优化
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setJdAnalysisOpen(true)}
-            className="gap-2 bg-transparent"
-          >
-            <Icon icon="mdi:target" className="h-4 w-4" />
-            JD 匹配
-          </Button>
-        </div>
-      </div>
+      <ResumeBuilderToolbar
+        title={editorState.resumeData.title}
+        resumeData={editorState.resumeData}
+        viewMode={viewMode}
+        autoSaveStatus={autoSaveStatus}
+        autoSaveLastSaved={autoSaveLastSaved}
+        autoSaveErrorMessage={autoSaveErrorMessage}
+        onViewModeChange={handleViewModeChange}
+        onBack={onBack}
+        onSave={onSave}
+        onOpenFullOptimize={() => setFullOptimizeOpen(true)}
+        onOpenJdAnalysis={() => setJdAnalysisOpen(true)}
+      />
 
       {/* 主要内容区域 */}
       <div className="editor-content">
