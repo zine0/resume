@@ -90,6 +90,33 @@ export async function validateResumeDataWithBackend(
   }
 }
 
+export async function parseAndValidateResumeDataJson(content: string): Promise<ResumeData> {
+  let parsed: unknown
+
+  try {
+    parsed = JSON.parse(content)
+  } catch {
+    throw new StorageError('简历数据格式错误', 'PARSE_ERROR')
+  }
+
+  try {
+    const validation = await invoke<ResumeValidationResult>('validate_resume_data_command', {
+      data: parsed,
+    })
+
+    if (!validation.isValid) {
+      throw new StorageError(`简历数据校验失败：${validation.errors.join('；')}`, 'PARSE_ERROR')
+    }
+
+    return await normalizeResumeDataIcons(validation.normalizedData)
+  } catch (e) {
+    if (e instanceof StorageError) throw e
+
+    const mapped = mapTauriError(e)
+    throw new StorageError(mapped.message, mapped.code === 'UNKNOWN' ? 'PARSE_ERROR' : mapped.code)
+  }
+}
+
 export async function importResumeFile(content: string): Promise<ResumeData> {
   try {
     const data = await invoke<ResumeData>('import_resume_file', { content })

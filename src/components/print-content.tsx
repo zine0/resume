@@ -9,18 +9,9 @@ export default function PrintContent({
   initialData?: ResumeData | null
   autoPrint?: boolean
 }) {
-  // 避免在 effect 中同步 setState：使用惰性初始化从 sessionStorage 恢复
+  // 避免在 effect 中同步 setState：打印页面仅接受显式传入的数据
   const [resumeData] = useState<ResumeData | null>(() => {
-    if (initialData) return initialData
-    if (typeof window !== 'undefined') {
-      try {
-        const s = sessionStorage.getItem('resumeData')
-        if (s) return JSON.parse(s) as ResumeData
-      } catch {
-        // sessionStorage may be unavailable in some contexts
-      }
-    }
-    return null
+    return initialData ?? null
   })
 
   // Auto print once when requested and data is ready
