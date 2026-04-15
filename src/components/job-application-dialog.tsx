@@ -18,7 +18,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import type { ApplicationInput, ApplicationStatus } from '@/types/application'
+import type {
+  ApplicationInput,
+  ApplicationReminderStatus,
+  ApplicationReviewStatus,
+  ApplicationStatus,
+} from '@/types/application'
 
 interface ResumeOption {
   id: string
@@ -40,8 +45,14 @@ const EMPTY_FORM: ApplicationInput = {
   status: 'wishlist',
   jdText: '',
   appliedAt: '',
+  source: '',
+  contactName: '',
+  contactChannel: '',
+  lastContactAt: '',
   nextAction: '',
   followUpDate: '',
+  blockedReason: '',
+  result: '',
   interviewStage: '',
   interviewRound: '',
   url: '',
@@ -56,6 +67,18 @@ const STATUS_OPTIONS: Array<{ value: ApplicationStatus; label: string }> = [
   { value: 'rejected', label: '未通过' },
 ]
 
+const REMINDER_STATUS_OPTIONS: Array<{ value: ApplicationReminderStatus; label: string }> = [
+  { value: 'pending', label: '待处理' },
+  { value: 'completed', label: '已完成' },
+  { value: 'snoozed', label: '稍后提醒' },
+]
+
+const REVIEW_STATUS_OPTIONS: Array<{ value: ApplicationReviewStatus; label: string }> = [
+  { value: 'active', label: '推进中' },
+  { value: 'waiting', label: '等待反馈' },
+  { value: 'blocked', label: '已阻塞' },
+]
+
 export default function JobApplicationDialog({
   open,
   onOpenChange,
@@ -68,11 +91,12 @@ export default function JobApplicationDialog({
 
   useEffect(() => {
     if (!open) return
-    setFormValues(initialValue ? { ...initialValue } : EMPTY_FORM)
+    setFormValues(initialValue ? { ...EMPTY_FORM, ...initialValue } : { ...EMPTY_FORM })
   }, [initialValue, open])
 
   const isEditing = Boolean(initialValue)
   const canSubmit = formValues.company.trim().length > 0 && formValues.role.trim().length > 0
+  const isReviewBlocked = formValues.reviewStatus === 'blocked'
 
   const handleSubmit = async () => {
     if (!canSubmit) return
@@ -92,8 +116,16 @@ export default function JobApplicationDialog({
       resumeTitle,
       url: formValues.url?.trim() || undefined,
       appliedAt: formValues.appliedAt?.trim() || undefined,
+      source: formValues.source?.trim() || undefined,
+      contactName: formValues.contactName?.trim() || undefined,
+      contactChannel: formValues.contactChannel?.trim() || undefined,
+      lastContactAt: formValues.lastContactAt?.trim() || undefined,
       nextAction: formValues.nextAction?.trim() || undefined,
       followUpDate: formValues.followUpDate?.trim() || undefined,
+      reminderStatus: formValues.reminderStatus,
+      reviewStatus: formValues.reviewStatus,
+      blockedReason: isReviewBlocked ? formValues.blockedReason?.trim() || undefined : undefined,
+      result: formValues.result?.trim() || undefined,
       interviewStage: isInterview ? formValues.interviewStage?.trim() || undefined : undefined,
       interviewRound: isInterview ? formValues.interviewRound?.trim() || undefined : undefined,
       notes: formValues.notes?.trim() || undefined,
@@ -167,6 +199,18 @@ export default function JobApplicationDialog({
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="job-source">投递来源</Label>
+            <Input
+              id="job-source"
+              value={formValues.source || ''}
+              onChange={(event) =>
+                setFormValues((prev) => ({ ...prev, source: event.target.value }))
+              }
+              placeholder="例如：BOSS 直聘 / 内推 / 官网"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="job-next-action">下一步动作</Label>
             <Input
               id="job-next-action"
@@ -189,6 +233,121 @@ export default function JobApplicationDialog({
               placeholder="例如：2026-04-18"
             />
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="job-contact-name">联系人</Label>
+            <Input
+              id="job-contact-name"
+              value={formValues.contactName || ''}
+              onChange={(event) =>
+                setFormValues((prev) => ({ ...prev, contactName: event.target.value }))
+              }
+              placeholder="例如：招聘 HR / 内推同学"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="job-contact-channel">联系渠道</Label>
+            <Input
+              id="job-contact-channel"
+              value={formValues.contactChannel || ''}
+              onChange={(event) =>
+                setFormValues((prev) => ({ ...prev, contactChannel: event.target.value }))
+              }
+              placeholder="例如：邮箱 / 微信 / 电话"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="job-last-contact-at">最近联系时间</Label>
+            <Input
+              id="job-last-contact-at"
+              value={formValues.lastContactAt || ''}
+              onChange={(event) =>
+                setFormValues((prev) => ({ ...prev, lastContactAt: event.target.value }))
+              }
+              placeholder="例如：2026-04-15 / 昨天下午"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>提醒状态</Label>
+            <Select
+              value={formValues.reminderStatus || 'none'}
+              onValueChange={(value) =>
+                setFormValues((prev) => ({
+                  ...prev,
+                  reminderStatus:
+                    value === 'none' ? undefined : (value as ApplicationReminderStatus),
+                }))
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="选择提醒状态" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">暂不设置</SelectItem>
+                {REMINDER_STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>审核状态</Label>
+            <Select
+              value={formValues.reviewStatus || 'none'}
+              onValueChange={(value) =>
+                setFormValues((prev) => ({
+                  ...prev,
+                  reviewStatus: value === 'none' ? undefined : (value as ApplicationReviewStatus),
+                  blockedReason: value === 'blocked' ? prev.blockedReason : '',
+                }))
+              }
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="选择审核状态" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">暂不设置</SelectItem>
+                {REVIEW_STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="job-result">当前结果</Label>
+            <Input
+              id="job-result"
+              value={formValues.result || ''}
+              onChange={(event) =>
+                setFormValues((prev) => ({ ...prev, result: event.target.value }))
+              }
+              placeholder="例如：待回复 / 已入人才库 / 已拒绝"
+            />
+          </div>
+
+          {isReviewBlocked ? (
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="job-blocked-reason">阻塞原因</Label>
+              <Textarea
+                id="job-blocked-reason"
+                value={formValues.blockedReason || ''}
+                onChange={(event) =>
+                  setFormValues((prev) => ({ ...prev, blockedReason: event.target.value }))
+                }
+                placeholder="例如：HC 暂停、流程搁置，或等待关键反馈"
+                className="min-h-[96px] resize-y"
+              />
+            </div>
+          ) : null}
 
           {formValues.status === 'interview' ? (
             <>

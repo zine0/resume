@@ -2,8 +2,8 @@ import {
   useCallback,
   useEffect,
   useMemo,
-  type MutableRefObject,
   type ReactNode,
+  type RefObject,
   useRef,
   useState,
   type CSSProperties,
@@ -115,10 +115,18 @@ function toInput(application: ApplicationEntry): ApplicationInput {
     resumeTitle: application.resumeTitle,
     url: application.url,
     appliedAt: application.appliedAt,
+    source: application.source,
+    contactName: application.contactName,
+    contactChannel: application.contactChannel,
+    lastContactAt: application.lastContactAt,
     nextAction: application.nextAction,
     followUpDate: application.followUpDate,
+    reminderStatus: application.reminderStatus,
     interviewStage: application.interviewStage,
     interviewRound: application.interviewRound,
+    reviewStatus: application.reviewStatus,
+    blockedReason: application.blockedReason,
+    result: application.result,
     notes: application.notes,
   }
 }
@@ -921,7 +929,7 @@ interface BoardColumnProps {
   movingId: string | null
   resumeTitleMap: Map<string, string>
   tailoringIds: string[]
-  cardWidthsRef: MutableRefObject<Map<string, number>>
+  cardWidthsRef: RefObject<Map<string, number>>
   renderApplicationCard: (args: RenderApplicationCardArgs) => ReactNode
   onEdit: (application: ApplicationEntry) => void
   onDelete: (application: ApplicationEntry) => void
@@ -1010,7 +1018,7 @@ interface BoardDraggableCardProps {
   linkedResumeTitle?: string
   tailoring: boolean
   movingId: string | null
-  cardWidthsRef: MutableRefObject<Map<string, number>>
+  cardWidthsRef: RefObject<Map<string, number>>
   renderApplicationCard: (args: RenderApplicationCardArgs) => ReactNode
   onEdit: (application: ApplicationEntry) => void
   onDelete: (application: ApplicationEntry) => void

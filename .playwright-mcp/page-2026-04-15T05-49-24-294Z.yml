@@ -1,0 +1,55 @@
+- generic [ref=e2]:
+  - main [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e7]:
+          - generic [ref=e8]:
+            - generic [ref=e9]:
+              - button "简历库" [ref=e10]:
+                - img
+                - text: 简历库
+              - generic [ref=e11]:
+                - heading "求职看板" [level=1] [ref=e12]
+                - generic [ref=e13]: "0"
+            - paragraph [ref=e14]: 把岗位、投递进度和结果放在同一块看板里统一推进，需要时再进入简历库管理版本。
+            - paragraph [ref=e15]: 简历库加载失败，当前仍可继续管理求职记录。
+          - generic [ref=e16]:
+            - textbox "搜索公司、岗位、下一步动作、JD 或备注..." [ref=e17]
+            - button "AI 设置" [ref=e18]:
+              - img
+              - text: AI 设置
+            - button "新增记录" [ref=e19]:
+              - img
+              - text: 新增记录
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - generic [ref=e22]:
+              - generic [ref=e23]: 总记录
+              - img [ref=e58]
+            - generic [ref=e24]: "0"
+          - generic [ref=e25]:
+            - generic [ref=e26]:
+              - generic [ref=e27]: 推进中
+              - img [ref=e60]
+            - generic [ref=e28]: "0"
+          - generic [ref=e29]:
+            - generic [ref=e31]: 面试阶段
+            - generic [ref=e32]: "0"
+          - generic [ref=e33]:
+            - generic [ref=e34]:
+              - generic [ref=e35]: Offer
+              - img [ref=e62]
+            - generic [ref=e36]: "0"
+      - generic [ref=e38]:
+        - generic [ref=e40]:
+          - heading "还没有求职记录" [level=2] [ref=e41]
+          - paragraph [ref=e42]: 先创建第一条记录，把目标岗位放进看板；后续可直接拖拽到不同阶段，持续跟踪投递节奏。
+        - generic [ref=e43]:
+          - button "新增第一条记录" [ref=e44]:
+            - img
+            - text: 新增第一条记录
+          - button "前往简历库" [ref=e45]:
+            - img
+            - text: 前往简历库
+  - region "Notifications (F8)":
+    - list
