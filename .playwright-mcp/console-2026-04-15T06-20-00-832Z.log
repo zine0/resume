@@ -1,0 +1,9 @@
+[  507685ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ http://localhost:5173/node_modules/.vite/deps/react-dom_client.js?v=79c1ef5c:20102
+[  507754ms] [WARNING] Failed to load template from: /template.json @ http://localhost:5173/src/lib/storage.ts:140
+[  507755ms] [WARNING] Failed to load template from: /template.json @ http://localhost:5173/src/lib/storage.ts:140
+[  507759ms] StorageError: Cannot read properties of undefined (reading 'invoke')
+    at mapTauriError (http://localhost:5173/src/lib/storage.ts:18:10)
+    at getDefaultResumeData (http://localhost:5173/src/lib/storage.ts:49:11)
+[  507760ms] StorageError: Cannot read properties of undefined (reading 'invoke')
+    at mapTauriError (http://localhost:5173/src/lib/storage.ts:18:10)
+    at getDefaultResumeData (http://localhost:5173/src/lib/storage.ts:49:11)

@@ -64,6 +64,40 @@ pub struct AiResumePatch {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct AiOptimizationPreviewItem {
+    pub target_kind: AiPatchTargetKind,
+    pub target_id: String,
+    pub section: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
+    pub content_kind: AiPatchContentKind,
+    pub original_text: String,
+    pub optimized_text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub salary_range: Option<crate::resume::SalaryRange>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AiOptimizationChangeGroup {
+    pub section: String,
+    pub items: Vec<AiOptimizationPreviewItem>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AiOptimizeResumeResult {
+    pub patch: AiResumePatch,
+    pub summary: String,
+    pub preview_items: Vec<AiOptimizationPreviewItem>,
+    pub change_groups: Vec<AiOptimizationChangeGroup>,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct AiPolishTextResult {
     pub text: String,
 }
@@ -144,7 +178,7 @@ pub async fn ai_polish_text(
 pub async fn ai_optimize_resume(
     app: tauri::AppHandle,
     data: ResumeData,
-) -> Result<AiResumePatch, String> {
+) -> Result<AiOptimizeResumeResult, String> {
     let config = load_ai_config(&app)?;
     let snapshot = build_editable_snapshot(&data);
     let system_prompt = "\u{4f60}\u{662f}\u{4e00}\u{4e2a}\u{4e13}\u{4e1a}\u{7684}\u{4e2d}\u{6587}\u{7b80}\u{5386}\u{4f18}\u{5316}\u{52a9}\u{624b}\u{3002}\u{8bf7}\u{57fa}\u{4e8e}\u{7528}\u{6237}\u{63d0}\u{4f9b}\u{7684}\u{53ef}\u{7f16}\u{8f91}\u{7b80}\u{5386}\u{5feb}\u{7167}\u{ff0c}\u{5bf9}\u{6574}\u{4efd}\u{7b80}\u{5386}\u{505a}\u{6574}\u{4f53}\u{4f18}\u{5316}\u{3002}
@@ -161,6 +195,7 @@ pub async fn ai_optimize_resume(
 
 \u{4f60}\u{5fc5}\u{987b}\u{4e25}\u{683c}\u{8fd4}\u{56de}\u{4ee5}\u{4e0b} JSON \u{7ed3}\u{6784}\u{ff0c}\u{4e0d}\u{8981}\u{8fd4}\u{56de}\u{5176}\u{4ed6}\u{6587}\u{5b57}\u{ff1a}
 {
+  \"summary\": \"本次优化的整体摘要\",
   \"operations\": [
     {
       \"targetKind\": \"resumeTitle | personalInfo | jobIntention | moduleElement | moduleTags\",
@@ -200,9 +235,20 @@ pub async fn ai_optimize_resume(
     let (mut operations, summary) = validate_patch_operations(&snapshot, parsed.operations);
     ensure_title_operation(&mut operations, build_optimized_title(&data.title));
 
-    Ok(AiResumePatch {
+    let preview_items = build_optimization_preview_items(&snapshot, &operations);
+    let change_groups = build_optimization_change_groups(&preview_items);
+    let warnings = build_optimization_warnings(&data, &summary);
+    let patch = AiResumePatch {
         operations,
-        warnings: build_optimization_warnings(&data, &summary),
+        warnings: warnings.clone(),
+    };
+
+    Ok(AiOptimizeResumeResult {
+        patch,
+        summary: build_optimization_summary(&parsed.summary, &preview_items),
+        preview_items,
+        change_groups,
+        warnings,
     })
 }
 
@@ -457,4 +503,144 @@ pub async fn ai_test_connection(app: tauri::AppHandle) -> Result<(), String> {
 #[allow(dead_code)]
 pub fn jd_suggestion_module_title() -> &'static str {
     JD_SUGGESTION_MODULE_TITLE
+}
+
+fn build_optimization_summary(_summary: &str, preview_items: &[AiOptimizationPreviewItem]) -> String {
+    if preview_items.is_empty() {
+        "AI 已完成优化预览，当前未发现可展示的文本差异，确认后仍会基于补丁创建新的优化副本。"
+            .to_string()
+    } else {
+        let mut sections = preview_items
+            .iter()
+            .map(|item| item.section.trim())
+            .filter(|section| !section.is_empty())
+            .collect::<Vec<_>>();
+        sections.sort_unstable();
+        sections.dedup();
+
+        let section_summary = if sections.is_empty() {
+            "多个简历区域".to_string()
+        } else {
+            sections.join("、")
+        };
+
+        format!(
+            "AI 已生成 {} 处已校验变更，主要涉及 {}；确认后会基于这些修改创建新的优化副本。",
+            preview_items.len(),
+            section_summary
+        )
+    }
+}
+
+fn build_optimization_preview_items(
+    snapshot: &ResumeOptimizationSnapshot,
+    operations: &[AiPatchOperation],
+) -> Vec<AiOptimizationPreviewItem> {
+    let target_map = snapshot
+        .targets
+        .iter()
+        .map(|target| ((target.target_kind.clone(), target.id.clone()), target))
+        .collect::<HashMap<_, _>>();
+
+    operations
+        .iter()
+        .filter_map(|operation| {
+            let key = (operation.target_kind.clone(), operation.target_id.clone());
+            let target = target_map.get(&key)?;
+            if !operation_changes_target(target, operation) {
+                return None;
+            }
+
+            Some(AiOptimizationPreviewItem {
+                target_kind: operation.target_kind.clone(),
+                target_id: operation.target_id.clone(),
+                section: target.section.clone(),
+                field: target.field.clone(),
+                content_kind: operation.content_kind.clone(),
+                original_text: target.original_text.clone(),
+                optimized_text: preview_text_for_operation(operation),
+                tags: operation.tags.clone(),
+                salary_range: operation.salary_range.clone(),
+            })
+        })
+        .collect()
+}
+
+fn build_optimization_change_groups(
+    preview_items: &[AiOptimizationPreviewItem],
+) -> Vec<AiOptimizationChangeGroup> {
+    let mut groups: Vec<AiOptimizationChangeGroup> = Vec::new();
+
+    for item in preview_items {
+        if let Some(group) = groups.iter_mut().find(|group| group.section == item.section) {
+            group.items.push(item.clone());
+        } else {
+            groups.push(AiOptimizationChangeGroup {
+                section: item.section.clone(),
+                items: vec![item.clone()],
+            });
+        }
+    }
+
+    groups
+}
+
+fn operation_changes_target(target: &EditableTargetSnapshot, operation: &AiPatchOperation) -> bool {
+    match operation.content_kind {
+        AiPatchContentKind::Tags => {
+            normalize_tags(target.tags.as_deref()) != normalize_tags(operation.tags.as_deref())
+        }
+        AiPatchContentKind::Salary => {
+            normalize_preview_text(&target.original_text)
+                != normalize_preview_text(&preview_text_for_operation(operation))
+                || !salary_ranges_match(target.salary_range.as_ref(), operation.salary_range.as_ref())
+        }
+        AiPatchContentKind::Plain | AiPatchContentKind::Markdown => {
+            normalize_preview_text(&target.original_text)
+                != normalize_preview_text(&preview_text_for_operation(operation))
+        }
+    }
+}
+
+fn preview_text_for_operation(operation: &AiPatchOperation) -> String {
+    match operation.content_kind {
+        AiPatchContentKind::Tags => operation
+            .tags
+            .as_ref()
+            .map(|tags| {
+                tags.iter()
+                    .map(|tag| tag.trim())
+                    .filter(|tag| !tag.is_empty())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            })
+            .unwrap_or_default(),
+        AiPatchContentKind::Plain | AiPatchContentKind::Markdown | AiPatchContentKind::Salary => {
+            operation.text.clone().unwrap_or_default()
+        }
+    }
+}
+
+fn normalize_preview_text(text: &str) -> String {
+    text.trim().to_string()
+}
+
+fn normalize_tags(tags: Option<&[String]>) -> Vec<String> {
+    tags.unwrap_or(&[])
+        .iter()
+        .map(|tag| tag.trim())
+        .filter(|tag| !tag.is_empty())
+        .map(ToString::to_string)
+        .collect()
+}
+
+fn salary_ranges_match(
+    left: Option<&crate::resume::SalaryRange>,
+    right: Option<&crate::resume::SalaryRange>,
+) -> bool {
+    match (left, right) {
+        (Some(left), Some(right)) => left.min == right.min && left.max == right.max,
+        (None, None) => true,
+        _ => false,
+    }
 }

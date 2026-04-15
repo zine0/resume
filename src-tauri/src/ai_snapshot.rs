@@ -2,9 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 
-use crate::ai_service::{
-    AiPatchContentKind, AiPatchOperation, AiPatchTargetKind,
-};
+use crate::ai_service::{AiPatchContentKind, AiPatchOperation, AiPatchTargetKind};
 use crate::resume::{
     JobIntentionType, ModuleContentRowType, PersonalInfoItem, PersonalInfoValueType, ResumeData,
     SalaryRange,
@@ -41,6 +39,8 @@ pub(crate) struct ResumeOptimizationSnapshot {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct OptimizationResponse {
     #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
     pub operations: Vec<AiPatchOperation>,
 }
 
@@ -76,7 +76,9 @@ pub(crate) fn strip_code_fences(raw: &str) -> String {
         .to_string()
 }
 
-pub(crate) fn expected_content_kind_for_target(target: &EditableTargetSnapshot) -> AiPatchContentKind {
+pub(crate) fn expected_content_kind_for_target(
+    target: &EditableTargetSnapshot,
+) -> AiPatchContentKind {
     target
         .content_kind
         .clone()
@@ -96,14 +98,20 @@ pub(crate) fn parse_salary_range(text: &str) -> Option<SalaryRange> {
 
     if numbers.len() == 1 {
         let value = numbers[0];
-        if ['\u{8d77}', '\u{4ee5}', '\u{4e0a}'].iter().any(|needle| text.contains(*needle)) {
+        if ['\u{8d77}', '\u{4ee5}', '\u{4e0a}']
+            .iter()
+            .any(|needle| text.contains(*needle))
+        {
             return Some(SalaryRange {
                 min: Some(value),
                 max: None,
             });
         }
 
-        if ['\u{4e0b}', '\u{5185}'].iter().any(|needle| text.contains(*needle)) {
+        if ['\u{4e0b}', '\u{5185}']
+            .iter()
+            .any(|needle| text.contains(*needle))
+        {
             return Some(SalaryRange {
                 min: None,
                 max: Some(value),
@@ -193,7 +201,10 @@ fn extract_text(value: &Value) -> String {
 pub(crate) fn build_resume_text(data: &ResumeData) -> String {
     let mut lines = Vec::new();
 
-    lines.push(format!("\u{3010}\u{7b80}\u{5386}\u{6807}\u{9898}\u{3011}{}", data.title));
+    lines.push(format!(
+        "\u{3010}\u{7b80}\u{5386}\u{6807}\u{9898}\u{3011}{}",
+        data.title
+    ));
     lines.push(String::new());
 
     if !data.personal_info_section.personal_info.is_empty() {
@@ -204,7 +215,11 @@ pub(crate) fn build_resume_text(data: &ResumeData) -> String {
         lines.push(String::new());
     }
 
-    if let Some(job_intention) = data.job_intention_section.as_ref().filter(|section| section.enabled) {
+    if let Some(job_intention) = data
+        .job_intention_section
+        .as_ref()
+        .filter(|section| section.enabled)
+    {
         if !job_intention.items.is_empty() {
             lines.push("\u{3010}\u{6c42}\u{804c}\u{610f}\u{5411}\u{3011}".to_string());
             for item in &job_intention.items {
@@ -283,28 +298,36 @@ pub(crate) fn build_editable_snapshot(data: &ResumeData) -> ResumeOptimizationSn
             }),
     );
 
-    if let Some(job_intention) = data.job_intention_section.as_ref().filter(|section| section.enabled) {
-        targets.extend(job_intention.items.iter().map(|item| EditableTargetSnapshot {
-            id: item.id.clone(),
-            target_kind: AiPatchTargetKind::JobIntention,
-            section: "\u{6c42}\u{804c}\u{610f}\u{5411}".to_string(),
-            field: Some(item.label.clone()),
-            content_kind: Some(if item.item_type == JobIntentionType::Salary {
-                AiPatchContentKind::Salary
-            } else {
-                AiPatchContentKind::Plain
-            }),
-            original_text: item.value.clone(),
-            tags: None,
-            salary_range: item.salary_range.clone(),
-            item_type: Some(match item.item_type {
-                JobIntentionType::WorkYears => "workYears",
-                JobIntentionType::Position => "position",
-                JobIntentionType::City => "city",
-                JobIntentionType::Salary => "salary",
-                JobIntentionType::Custom => "custom",
+    if let Some(job_intention) = data
+        .job_intention_section
+        .as_ref()
+        .filter(|section| section.enabled)
+    {
+        targets.extend(job_intention.items.iter().map(|item| {
+            EditableTargetSnapshot {
+                id: item.id.clone(),
+                target_kind: AiPatchTargetKind::JobIntention,
+                section: "\u{6c42}\u{804c}\u{610f}\u{5411}".to_string(),
+                field: Some(item.label.clone()),
+                content_kind: Some(if item.item_type == JobIntentionType::Salary {
+                    AiPatchContentKind::Salary
+                } else {
+                    AiPatchContentKind::Plain
+                }),
+                original_text: item.value.clone(),
+                tags: None,
+                salary_range: item.salary_range.clone(),
+                item_type: Some(
+                    match item.item_type {
+                        JobIntentionType::WorkYears => "workYears",
+                        JobIntentionType::Position => "position",
+                        JobIntentionType::City => "city",
+                        JobIntentionType::Salary => "salary",
+                        JobIntentionType::Custom => "custom",
+                    }
+                    .to_string(),
+                ),
             }
-            .to_string()),
         }));
     }
 
@@ -422,7 +445,8 @@ pub(crate) fn validate_patch_operations(
             continue;
         }
 
-        if operation.content_kind == AiPatchContentKind::Salary && operation.salary_range.is_none() {
+        if operation.content_kind == AiPatchContentKind::Salary && operation.salary_range.is_none()
+        {
             let parsed = operation.text.as_deref().and_then(parse_salary_range);
             if let Some(range) = parsed {
                 valid.push(AiPatchOperation {
@@ -439,7 +463,10 @@ pub(crate) fn validate_patch_operations(
         seen.insert(key);
     }
 
-    summary.missing_title = !seen.contains(&(AiPatchTargetKind::ResumeTitle, RESUME_TITLE_TARGET_ID.to_string()));
+    summary.missing_title = !seen.contains(&(
+        AiPatchTargetKind::ResumeTitle,
+        RESUME_TITLE_TARGET_ID.to_string(),
+    ));
     summary.missing_personal_info_count = snapshot
         .targets
         .iter()
@@ -481,7 +508,10 @@ pub(crate) fn validate_patch_operations(
     (valid, summary)
 }
 
-pub(crate) fn build_optimization_warnings(data: &ResumeData, summary: &PatchValidationSummary) -> Vec<String> {
+pub(crate) fn build_optimization_warnings(
+    data: &ResumeData,
+    summary: &PatchValidationSummary,
+) -> Vec<String> {
     let protected_personal_info_count = data
         .personal_info_section
         .personal_info

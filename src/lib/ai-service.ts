@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { markdownToRichContent } from '@/lib/markdown'
 import type {
+  AiOptimizeResumeResult,
   AiPatchOperation,
   AiPatchTargetKind,
   AiPolishTextResult,
@@ -188,9 +189,9 @@ export async function aiPolishText(text: string, mode: PolishMode): Promise<AiPo
   }
 }
 
-export async function aiOptimizeResume(data: ResumeData): Promise<AiResumePatch> {
+export async function aiOptimizeResume(data: ResumeData): Promise<AiOptimizeResumeResult> {
   try {
-    return await invoke<AiResumePatch>('ai_optimize_resume', { data })
+    return await invoke<AiOptimizeResumeResult>('ai_optimize_resume', { data })
   } catch (error) {
     throw mapInvokeError(error, '简历优化失败')
   }

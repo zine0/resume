@@ -35,6 +35,31 @@ export interface AiResumePatch {
   warnings: string[]
 }
 
+export interface AiOptimizationPreviewItem {
+  targetKind: AiPatchTargetKind
+  targetId: string
+  section: string
+  field?: string
+  contentKind: AiPatchContentKind
+  originalText: string
+  optimizedText: string
+  tags?: string[]
+  salaryRange?: SalaryRangeValue
+}
+
+export interface AiOptimizationChangeGroup {
+  section: string
+  items: AiOptimizationPreviewItem[]
+}
+
+export interface AiOptimizeResumeResult {
+  patch: AiResumePatch
+  summary: string
+  previewItems: AiOptimizationPreviewItem[]
+  changeGroups: AiOptimizationChangeGroup[]
+  warnings: string[]
+}
+
 export interface AiPolishTextResult {
   text: string
 }
