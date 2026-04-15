@@ -1,9 +1,16 @@
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import ResumeBuilder from '@/components/resume-builder'
 import type { CreateResumeLineageInput, ResumeData, StoredResume } from '@/types/resume'
-import { createEntryFromData, StorageError, getResumeById } from '@/lib/storage'
+import {
+  createEntryFromData,
+  parseAndValidateResumeDataJson,
+  StorageError,
+  getResumeById,
+} from '@/lib/storage'
 import { useToast } from '@/hooks/use-toast'
+import { Button } from '@/components/ui/button'
+import { Icon } from '@iconify/react'
 
 export default function EditNew() {
   return (
@@ -21,32 +28,106 @@ function EditNewContent() {
   const cloneId = searchParams.get('clone')
   const useExample = searchParams.get('example') === '1' || searchParams.get('example') === 'true'
 
-  // 从 sessionStorage 恢复用户中心预加载的数据
-  const prefetchedData: ResumeData | undefined = useMemo(() => {
-    try {
+  const [prefetchedData, setPrefetchedData] = useState<ResumeData | undefined>(undefined)
+  const [prefetchedLoading, setPrefetchedLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const loadPrefetchedData = async () => {
       const raw = sessionStorage.getItem('new-edit-initial-data')
-      if (!raw) return undefined
-      const parsed = JSON.parse(raw) as ResumeData
+      if (!raw) {
+        if (!cancelled) {
+          setPrefetchedData(undefined)
+          setPrefetchedLoading(false)
+        }
+        return
+      }
+
       sessionStorage.removeItem('new-edit-initial-data')
-      return parsed
-    } catch {
-      return undefined
+
+      try {
+        const validated = await parseAndValidateResumeDataJson(raw)
+        if (!cancelled) {
+          setPrefetchedData(validated)
+        }
+      } catch (error) {
+        if (cancelled) return
+
+        setPrefetchedData(undefined)
+        toast({
+          title: '预加载简历数据无效',
+          description: error instanceof Error ? error.message : '无法恢复预加载的简历数据。',
+          variant: 'destructive',
+        })
+      } finally {
+        if (!cancelled) {
+          setPrefetchedLoading(false)
+        }
+      }
     }
-  }, [])
+
+    void loadPrefetchedData()
+
+    return () => {
+      cancelled = true
+    }
+  }, [toast])
 
   // 异步加载克隆数据
   const [clonedData, setClonedData] = useState<ResumeData | undefined>(undefined)
   const [clonedEntry, setClonedEntry] = useState<StoredResume | null>(null)
+  const [cloneLoading, setCloneLoading] = useState(false)
+  const [cloneLoadError, setCloneLoadError] = useState<string | null>(null)
+  const [cloneReloadKey, setCloneReloadKey] = useState(0)
+  const [resolvedCloneId, setResolvedCloneId] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!cloneId) return
-    getResumeById(cloneId).then((entry) => {
-      if (entry) {
-        setClonedEntry(entry)
-        setClonedData({ ...entry.resumeData })
+    let cancelled = false
+    void cloneReloadKey
+
+    const loadClonedEntry = async () => {
+      if (!cloneId) {
+        setClonedEntry(null)
+        setClonedData(undefined)
+        setCloneLoadError(null)
+        setResolvedCloneId(null)
+        setCloneLoading(false)
+        return
       }
-    })
-  }, [cloneId])
+
+      setCloneLoading(true)
+      setCloneLoadError(null)
+
+      try {
+        const entry = await getResumeById(cloneId)
+        if (cancelled) return
+
+        setClonedEntry(entry)
+        setClonedData(entry ? { ...entry.resumeData } : undefined)
+        setResolvedCloneId(cloneId)
+      } catch (error) {
+        if (cancelled) return
+        const message =
+          error instanceof Error ? error.message : '加载要复制的简历失败，请稍后再试。'
+        setClonedEntry(null)
+        setClonedData(undefined)
+        setCloneLoadError(message)
+        setResolvedCloneId(cloneId)
+        toast({ title: '加载简历失败', description: message, variant: 'destructive' })
+      } finally {
+        if (!cancelled) {
+          setCloneLoading(false)
+        }
+      }
+    }
+
+    loadClonedEntry()
+
+    return () => {
+      cancelled = true
+    }
+  }, [cloneId, cloneReloadKey, toast])
 
   const buildDerivedLineage = (
     variantKind: CreateResumeLineageInput['variantKind'],
@@ -84,6 +165,47 @@ function EditNewContent() {
   ) => {
     const entry = await createEntryFromData(data, buildDerivedLineage(variantKind))
     navigate(`/edit/${entry.id}`)
+  }
+
+  if (cloneLoading || prefetchedLoading || cloneId !== resolvedCloneId) {
+    return <main className="bg-background min-h-screen" />
+  }
+
+  if (cloneLoadError) {
+    return (
+      <main className="bg-background min-h-screen p-6">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="outline"
+            className="gap-2 bg-transparent"
+            onClick={() => navigate('/resumes')}
+          >
+            <Icon icon="mdi:arrow-left" className="h-4 w-4" /> 返回
+          </Button>
+          <Button variant="outline" onClick={() => setCloneReloadKey((value) => value + 1)}>
+            重新加载
+          </Button>
+          <span className="text-destructive text-sm">{cloneLoadError}</span>
+        </div>
+      </main>
+    )
+  }
+
+  if (cloneId && !clonedEntry) {
+    return (
+      <main className="bg-background min-h-screen p-6">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            className="gap-2 bg-transparent"
+            onClick={() => navigate('/resumes')}
+          >
+            <Icon icon="mdi:arrow-left" className="h-4 w-4" /> 返回
+          </Button>
+          <span className="text-destructive text-sm">未找到要复制的简历</span>
+        </div>
+      </main>
+    )
   }
 
   return (
