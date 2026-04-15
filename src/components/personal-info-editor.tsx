@@ -58,7 +58,10 @@ type SortableHandleProps = Pick<ReturnType<typeof useSortable>, 'attributes' | '
 
 function buildInlineSvgDataUrl(icon?: string) {
   if (!icon) return ''
-  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${icon}</svg>`)}`
+  const svgMarkup = icon.trim().startsWith('<svg')
+    ? icon
+    : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${icon}</svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svgMarkup)}`
 }
 
 /**
@@ -550,7 +553,9 @@ function PersonalInfoItemEditor({
           >
             {item.icon ? (
               <img src={buildInlineSvgDataUrl(item.icon)} alt="当前图标" className="h-4 w-4" />
-            ) : null}
+            ) : (
+              <div className="h-4 w-4 rounded-sm border border-dashed border-gray-400" />
+            )}
           </Button>
         </DialogTrigger>
         <DialogContent>

@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
+import { normalizeResumeDataIcons, normalizeStoredResumeIcons } from '@/lib/icon-storage'
 import type { ApplicationEntry, ApplicationInput } from '@/types/application'
 import type {
   CreateResumeLineageInput,
@@ -42,7 +43,8 @@ function mapTauriError(e: unknown): StorageError {
 
 export async function getAllResumes(): Promise<StoredResume[]> {
   try {
-    return await invoke<StoredResume[]>('get_all_resumes')
+    const entries = await invoke<StoredResume[]>('get_all_resumes')
+    return await Promise.all(entries.map(normalizeStoredResumeIcons))
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -50,7 +52,8 @@ export async function getAllResumes(): Promise<StoredResume[]> {
 
 export async function getResumeById(id: string): Promise<StoredResume | null> {
   try {
-    return await invoke<StoredResume | null>('get_resume_by_id', { id })
+    const entry = await invoke<StoredResume | null>('get_resume_by_id', { id })
+    return entry ? await normalizeStoredResumeIcons(entry) : null
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -70,7 +73,8 @@ export async function upsertResume(entry: StoredResume): Promise<StoredResume> {
 
 export async function getDefaultResumeData(): Promise<ResumeData> {
   try {
-    return await invoke<ResumeData>('get_default_resume_data')
+    const data = await invoke<ResumeData>('get_default_resume_data')
+    return await normalizeResumeDataIcons(data)
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -88,7 +92,8 @@ export async function validateResumeDataWithBackend(
 
 export async function importResumeFile(content: string): Promise<ResumeData> {
   try {
-    return await invoke<ResumeData>('import_resume_file', { content })
+    const data = await invoke<ResumeData>('import_resume_file', { content })
+    return await normalizeResumeDataIcons(data)
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -96,7 +101,8 @@ export async function importResumeFile(content: string): Promise<ResumeData> {
 
 export async function exportResumeFile(data: ResumeData): Promise<string> {
   try {
-    return await invoke<string>('export_resume_file', { data })
+    const normalizedData = await normalizeResumeDataIcons(data)
+    return await invoke<string>('export_resume_file', { data: normalizedData })
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -161,7 +167,12 @@ export async function createEntryFromData(
   lineage?: CreateResumeLineageInput,
 ): Promise<StoredResume> {
   try {
-    return await invoke<StoredResume>('create_resume_from_data', { data, lineage })
+    const normalizedData = await normalizeResumeDataIcons(data)
+    const entry = await invoke<StoredResume>('create_resume_from_data', {
+      data: normalizedData,
+      lineage,
+    })
+    return await normalizeStoredResumeIcons(entry)
   } catch (e) {
     throw mapTauriError(e)
   }
@@ -169,12 +180,17 @@ export async function createEntryFromData(
 
 export async function updateEntryData(id: string, data: ResumeData): Promise<StoredResume> {
   try {
-    const validation = await validateResumeDataWithBackend(data)
+    const normalizedIconsData = await normalizeResumeDataIcons(data)
+    const validation = await validateResumeDataWithBackend(normalizedIconsData)
     if (!validation.isValid) {
       throw new StorageError(`简历数据校验失败：${validation.errors.join('；')}`)
     }
 
-    return await invoke<StoredResume>('update_resume', { id, data: validation.normalizedData })
+    const entry = await invoke<StoredResume>('update_resume', {
+      id,
+      data: validation.normalizedData,
+    })
+    return await normalizeStoredResumeIcons(entry)
   } catch (e) {
     if (e instanceof StorageError) throw e
     throw mapTauriError(e)

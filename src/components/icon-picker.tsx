@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { extractSvgBody, getIconSvgMarkup } from '@/lib/icon-storage'
 import { Icon } from '@iconify/react'
-import { iconToSVG, getIconData } from '@iconify/utils'
 
 interface IconPickerProps {
   selectedIcon?: string
@@ -45,36 +45,7 @@ const COMMON_ICONS = [
   { icon: 'mdi:trophy', label: '奖杯' },
 ]
 
-/**
- * 获取图标的SVG路径数据
- */
-export async function getIconSvgPath(iconName: string): Promise<string | null> {
-  if (!iconName) return null
-
-  try {
-    // 解析图标名称，例如 "mdi:account" => { prefix: "mdi", name: "account" }
-    const [prefix, name] = iconName.split(':')
-    if (!prefix || !name) return null
-
-    // 从Iconify API获取图标数据
-    const response = await fetch(`https://api.iconify.design/${prefix}.json?icons=${name}`)
-    const data = await response.json()
-
-    if (!data || !data.icons || !data.icons[name]) {
-      return null
-    }
-
-    // 使用@iconify/utils将图标数据转换为SVG
-    const iconData = getIconData(data, name)
-    if (!iconData) return null
-
-    const svg = iconToSVG(iconData, { height: 'auto' })
-    return svg.body
-  } catch (error) {
-    console.error('获取图标SVG路径失败:', error)
-    return null
-  }
-}
+export const getIconSvgPath = getIconSvgMarkup
 
 /**
  * 图标选择器组件
@@ -83,6 +54,7 @@ export default function IconPicker({ selectedIcon, onSelect }: IconPickerProps) 
   const [searchTerm, setSearchTerm] = useState('')
   const [searchResults, setSearchResults] = useState<{ icon: string; label: string }[]>([])
   const [isSearching, setIsSearching] = useState(false)
+  const [iconSvgCache, setIconSvgCache] = useState<Record<string, string>>({})
 
   // 初始显示常用图标列表
   const filteredIcons = searchTerm
@@ -129,6 +101,51 @@ export default function IconPicker({ selectedIcon, onSelect }: IconPickerProps) 
     return () => clearTimeout(timer)
   }, [searchTerm])
 
+  useEffect(() => {
+    const missingIcons = filteredIcons
+      .filter(({ icon }) => !iconSvgCache[icon])
+      .map(({ icon }) => icon)
+    if (missingIcons.length === 0) return
+
+    let cancelled = false
+
+    Promise.all(
+      missingIcons.map(async (icon) => {
+        const svg = await getIconSvgPath(icon)
+        return svg ? [icon, svg] : null
+      }),
+    ).then((results) => {
+      if (cancelled) return
+      setIconSvgCache((prev) => {
+        const next = { ...prev }
+        let changed = false
+        for (const entry of results) {
+          if (!entry) continue
+          const [icon, svg] = entry
+          if (next[icon] !== svg) {
+            next[icon] = svg
+            changed = true
+          }
+        }
+        return changed ? next : prev
+      })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [filteredIcons, iconSvgCache])
+
+  const isSelectedIcon = (icon: string) => {
+    if (!selectedIcon) return false
+    const cachedIcon = iconSvgCache[icon]
+    return (
+      selectedIcon === icon ||
+      selectedIcon === cachedIcon ||
+      (cachedIcon ? selectedIcon === extractSvgBody(cachedIcon) : false)
+    )
+  }
+
   return (
     <div className="space-y-4">
       {/* 搜索框 */}
@@ -136,6 +153,7 @@ export default function IconPicker({ selectedIcon, onSelect }: IconPickerProps) 
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
         placeholder="搜索图标..."
+        aria-label="搜索图标"
         className="w-full"
       />
 
@@ -145,11 +163,12 @@ export default function IconPicker({ selectedIcon, onSelect }: IconPickerProps) 
           {/* 空选项 */}
           <Button
             key="empty-icon"
-            variant={selectedIcon === '' ? 'default' : 'outline'}
+            variant={!selectedIcon ? 'default' : 'outline'}
             size="sm"
             onClick={() => onSelect('')}
             className="flex h-12 w-12 flex-col items-center justify-center gap-1 p-0"
             title="不使用图标"
+            aria-label="不使用图标"
           >
             <div className="flex h-5 w-5 items-center justify-center rounded-sm border border-dashed border-gray-400">
               <span className="text-xs text-gray-400">无</span>
@@ -160,15 +179,16 @@ export default function IconPicker({ selectedIcon, onSelect }: IconPickerProps) 
           {filteredIcons.map(({ icon, label }) => (
             <Button
               key={icon}
-              variant={selectedIcon === icon ? 'default' : 'outline'}
+              variant={isSelectedIcon(icon) ? 'default' : 'outline'}
               size="sm"
               onClick={() => {
                 getIconSvgPath(icon).then((svgPath) => {
-                  onSelect(svgPath || '')
+                  if (svgPath) onSelect(svgPath)
                 })
               }}
               className="flex h-12 w-12 flex-col items-center justify-center gap-1 p-0"
               title={label}
+              aria-label={`选择图标：${label}`}
             >
               <Icon icon={icon} className="h-5 w-5" />
             </Button>

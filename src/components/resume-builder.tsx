@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Icon } from '@iconify/react'
 import type { ResumeData, EditorState } from '@/types/resume'
 import type { AutoSaveStatus } from '@/hooks/use-auto-save'
+import { normalizeResumeDataIcons } from '@/lib/icon-storage'
 import { loadDefaultTemplate, loadExampleTemplate } from '@/lib/storage'
 import ResumePreview from './resume-preview'
 import PersonalInfoEditor from './personal-info-editor'
@@ -40,6 +41,7 @@ const ViewModeSelector = memo(
         {modes.map((mode) => (
           <button
             key={mode.key}
+            type="button"
             onClick={() => onViewModeChange(mode.key)}
             className={`relative flex min-w-[100px] items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-200 ${
               viewMode === mode.key
@@ -82,14 +84,7 @@ export default function ResumeBuilder({
   autoSaveStatus?: AutoSaveStatus
   autoSaveLastSaved?: string | null
 }) {
-  const [editorState, setEditorState] = useState<EditorState | null>(() => {
-    if (!initialData) return null
-    return {
-      resumeData: initialData,
-      isEditing: true,
-      showPreview: true,
-    }
-  })
+  const [editorState, setEditorState] = useState<EditorState | null>(null)
 
   const isMobile = useIsMobile()
   const userOverridden = useRef(false)
@@ -104,20 +99,17 @@ export default function ResumeBuilder({
   }, [isMobile])
 
   useEffect(() => {
-    if (initialData) {
-      setEditorState({
-        resumeData: initialData,
-        isEditing: true,
-        showPreview: true,
-      })
-      return
-    }
-
     const loadTemplate = async () => {
-      const tpl = template === 'example' ? await loadExampleTemplate() : await loadDefaultTemplate()
-      if (!tpl) return
+      const baseData = initialData
+        ? await normalizeResumeDataIcons(initialData)
+        : template === 'example'
+          ? await loadExampleTemplate()
+          : await loadDefaultTemplate()
+
+      if (!baseData) return
+
       setEditorState({
-        resumeData: tpl,
+        resumeData: baseData,
         isEditing: true,
         showPreview: true,
       })

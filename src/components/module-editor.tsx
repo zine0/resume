@@ -52,7 +52,10 @@ type SortableHandleProps = Pick<ReturnType<typeof useSortable>, 'attributes' | '
 
 function buildInlineSvgDataUrl(icon?: string) {
   if (!icon) return ''
-  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${icon}</svg>`)}`
+  const svgMarkup = icon.trim().startsWith('<svg')
+    ? icon
+    : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">${icon}</svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svgMarkup)}`
 }
 
 export default function ModuleEditor({ modules, onUpdate }: ModuleEditorProps) {

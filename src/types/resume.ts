@@ -18,7 +18,7 @@ export interface PersonalInfoItem {
   label: string
   /** 值信息 */
   value: PersonalInfoValue
-  /** 图标名称（来自iconify） */
+  /** 图标内容（兼容旧 iconify 名称，当前优先存储 SVG） */
   icon?: string
   /** 唯一标识符 */
   id: string

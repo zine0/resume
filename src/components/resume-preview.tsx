@@ -16,41 +16,102 @@ function ResumePreview({
   resumeData,
   emptyStateMessage = '暂无简历内容，请在左侧编辑区域添加模块',
 }: ResumePreviewProps) {
-  const sanitizeIcon = (html: string) =>
-    DOMPurify.sanitize(html, {
-      ADD_TAGS: [
-        'path',
-        'circle',
-        'rect',
-        'ellipse',
-        'line',
-        'polyline',
-        'polygon',
-        'g',
-        'defs',
-        'use',
-      ],
-      ADD_ATTR: [
-        'd',
-        'fill',
-        'stroke',
-        'stroke-width',
-        'cx',
-        'cy',
-        'r',
-        'x',
-        'y',
-        'width',
-        'height',
-        'viewBox',
-        'points',
-        'transform',
-        'opacity',
-        'fill-rule',
-        'clip-rule',
-        'id',
-      ],
-    })
+  const parseStoredIcon = (icon?: string) => {
+    if (!icon) return null
+    const trimmed = icon.trim()
+    if (!trimmed) return null
+
+    const svgMatch = trimmed.match(/<svg\b([^>]*)>([\s\S]*?)<\/svg>/i)
+    if (!svgMatch) {
+      return {
+        body: trimmed,
+        viewBox: '0 0 24 24',
+      }
+    }
+
+    const attrs = svgMatch[1] ?? ''
+    const body = svgMatch[2]?.trim() ?? ''
+    const viewBoxMatch = attrs.match(/viewBox=(['"])(.*?)\1/i)
+
+    return {
+      body,
+      viewBox: viewBoxMatch?.[2] || '0 0 24 24',
+    }
+  }
+
+  const sanitizeIcon = (icon?: string) => {
+    const parsed = parseStoredIcon(icon)
+    if (!parsed?.body) return null
+
+    const sanitizedSvg = DOMPurify.sanitize(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${parsed.viewBox}">${parsed.body}</svg>`,
+      {
+        USE_PROFILES: { svg: true, svgFilters: true },
+        ADD_TAGS: [
+          'path',
+          'circle',
+          'rect',
+          'ellipse',
+          'line',
+          'polyline',
+          'polygon',
+          'g',
+          'defs',
+          'use',
+          'clipPath',
+          'mask',
+          'symbol',
+          'linearGradient',
+          'radialGradient',
+          'stop',
+        ],
+        ADD_ATTR: [
+          'd',
+          'fill',
+          'stroke',
+          'stroke-width',
+          'stroke-linecap',
+          'stroke-linejoin',
+          'stroke-miterlimit',
+          'stroke-dasharray',
+          'stroke-dashoffset',
+          'cx',
+          'cy',
+          'r',
+          'x',
+          'y',
+          'width',
+          'height',
+          'viewBox',
+          'points',
+          'transform',
+          'opacity',
+          'fill-opacity',
+          'stroke-opacity',
+          'fill-rule',
+          'clip-rule',
+          'clip-path',
+          'clipPathUnits',
+          'mask',
+          'maskUnits',
+          'maskContentUnits',
+          'id',
+          'href',
+          'xlink:href',
+          'xmlns',
+          'xmlns:xlink',
+          'preserveAspectRatio',
+          'offset',
+          'stop-color',
+          'stop-opacity',
+          'gradientUnits',
+          'gradientTransform',
+        ],
+      },
+    )
+
+    return parseStoredIcon(String(sanitizedSvg))
+  }
 
   // eslint-disable-next-line no-control-regex
   const isAsciiOnly = (str: string | undefined) => !!str && /^[\x00-\x7F]+$/.test(str)
@@ -117,6 +178,23 @@ function ResumePreview({
       ? undefined
       : { width: rightBoxHeight, height: rightBoxHeight }
     : baseAvatarStyle
+
+  const renderStoredIcon = (
+    icon?: string,
+    className = 'resume-icon text-foreground h-[1em] w-[1em] shrink-0',
+  ) => {
+    const parsed = sanitizeIcon(icon)
+    if (!parsed?.body) return null
+
+    return (
+      <svg
+        className={className}
+        fill="currentColor"
+        viewBox={parsed.viewBox}
+        dangerouslySetInnerHTML={{ __html: parsed.body }}
+      />
+    )
+  }
   const headerAlignClass = resumeData.centerTitle
     ? 'flex-col items-center'
     : 'justify-between items-start'
@@ -230,29 +308,18 @@ function ResumePreview({
         if (jobIntentionFontScale !== 1) setJobIntentionFontScale(1)
       }
     }
-    // 初次 + 多轮调度，确保收缩场景也能捕获（如列数减少、模块隐藏）
+    // 初次测量 + 下一帧复核，避免切页后再被延迟定时器二次改写布局
     measure()
     const raf = requestAnimationFrame(measure)
-    const t1 = setTimeout(measure, 0)
-    const t2 = setTimeout(measure, 60)
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : undefined
     if (ro) {
       ro.observe(el)
       if (rightRef.current) ro.observe(rightRef.current)
     }
-    const mo =
-      typeof MutationObserver !== 'undefined'
-        ? new MutationObserver(() => requestAnimationFrame(measure))
-        : undefined
-    if (mo)
-      mo.observe(el, { subtree: true, childList: true, characterData: true, attributes: true })
     window.addEventListener('resize', measure)
     return () => {
       cancelAnimationFrame(raf)
-      clearTimeout(t1)
-      clearTimeout(t2)
       if (ro) ro.disconnect()
-      if (mo) mo.disconnect()
       window.removeEventListener('resize', measure)
     }
   }, [
@@ -331,13 +398,9 @@ function ResumePreview({
                     key={item.id}
                     className="personal-info-item flex shrink-0 items-center gap-0.5 whitespace-nowrap"
                   >
-                    {item.icon && (
-                      <svg
-                        className="resume-icon h-[1em] w-[1em] shrink-0"
-                        fill="black"
-                        viewBox="0 0 24 24"
-                        dangerouslySetInnerHTML={{ __html: sanitizeIcon(item.icon) }}
-                      />
+                    {renderStoredIcon(
+                      item.icon,
+                      'resume-icon text-foreground h-[1em] w-[1em] shrink-0',
                     )}
                     {resumeData.personalInfoSection?.showPersonalInfoLabels !== false && (
                       <span className="text-muted-foreground shrink-0 text-sm leading-none">
@@ -393,13 +456,9 @@ function ResumePreview({
                       key={item.id}
                       className="personal-info-item inline-flex items-center gap-0.5 whitespace-nowrap"
                     >
-                      {item.icon && (
-                        <svg
-                          className="resume-icon h-[1em] w-[1em] flex-shrink-0"
-                          fill="black"
-                          viewBox="0 0 24 24"
-                          dangerouslySetInnerHTML={{ __html: sanitizeIcon(item.icon) }}
-                        />
+                      {renderStoredIcon(
+                        item.icon,
+                        'resume-icon text-foreground h-[1em] w-[1em] flex-shrink-0',
                       )}
                       {resumeData.personalInfoSection?.showPersonalInfoLabels !== false && (
                         <span className="text-muted-foreground flex-shrink-0 text-sm leading-none">
@@ -438,13 +497,9 @@ function ResumePreview({
                   key={item.id}
                   className="personal-info-item flex shrink-0 items-center gap-0.5 whitespace-nowrap"
                 >
-                  {item.icon && (
-                    <svg
-                      className="resume-icon h-[1em] w-[1em] shrink-0"
-                      fill="black"
-                      viewBox="0 0 24 24"
-                      dangerouslySetInnerHTML={{ __html: sanitizeIcon(item.icon) }}
-                    />
+                  {renderStoredIcon(
+                    item.icon,
+                    'resume-icon text-foreground h-[1em] w-[1em] shrink-0',
                   )}
                   {resumeData.personalInfoSection?.showPersonalInfoLabels !== false && (
                     <span className="text-muted-foreground shrink-0 text-sm leading-none">
@@ -492,13 +547,9 @@ function ResumePreview({
                       key={item.id}
                       className="personal-info-item inline-flex items-center gap-0.5 whitespace-nowrap"
                     >
-                      {item.icon && (
-                        <svg
-                          className="resume-icon h-[1em] w-[1em] flex-shrink-0"
-                          fill="black"
-                          viewBox="0 0 24 24"
-                          dangerouslySetInnerHTML={{ __html: sanitizeIcon(item.icon) }}
-                        />
+                      {renderStoredIcon(
+                        item.icon,
+                        'resume-icon text-foreground h-[1em] w-[1em] flex-shrink-0',
                       )}
                       {resumeData.personalInfoSection?.showPersonalInfoLabels !== false && (
                         <span className="text-muted-foreground flex-shrink-0 text-sm leading-none">
@@ -553,14 +604,7 @@ function ResumePreview({
           .map((module) => (
             <div key={module.id} className="resume-module">
               <div className="module-title text-foreground border-border mb-3 flex items-center gap-2 border-b pb-2 text-lg font-semibold">
-                {module.icon && (
-                  <svg
-                    width={20}
-                    height={20}
-                    viewBox="0 0 24 24"
-                    dangerouslySetInnerHTML={{ __html: sanitizeIcon(module.icon) }}
-                  />
-                )}
+                {renderStoredIcon(module.icon, 'text-foreground h-5 w-5 shrink-0')}
                 {module.title}
               </div>
 
