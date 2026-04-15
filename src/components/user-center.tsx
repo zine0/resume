@@ -18,11 +18,13 @@ import { Badge } from '@/components/ui/badge'
 import { Icon } from '@iconify/react'
 import { useToast } from '@/hooks/use-toast'
 import ResumePreview from '@/components/resume-preview'
+import type { ApplicationEntry, ApplicationStatus } from '@/types/application'
 import type { StoredResume } from '@/types/resume'
 import {
   StorageError,
   createEntryFromData,
   deleteResumes,
+  getAllApplications,
   getAllResumes,
   getDefaultResumeData,
   importResumeFile,
@@ -84,6 +86,37 @@ interface ResumeCompareSummary {
   jobIntentionChanged: boolean
 }
 
+const APPLICATION_STATUS_META: Record<ApplicationStatus, { label: string; className: string }> = {
+  wishlist: {
+    label: '待投递',
+    className: 'border-border bg-background text-muted-foreground',
+  },
+  applied: {
+    label: '已投递',
+    className: 'border-primary/20 bg-primary/10 text-primary',
+  },
+  interview: {
+    label: '面试中',
+    className: 'border-chart-2/20 bg-chart-2/12 text-chart-2',
+  },
+  offer: {
+    label: 'Offer',
+    className: 'border-chart-4/25 bg-chart-4/12 text-chart-4',
+  },
+  rejected: {
+    label: '未通过',
+    className: 'border-chart-3/20 bg-chart-3/12 text-chart-3',
+  },
+}
+
+const APPLICATION_STATUS_ORDER: ApplicationStatus[] = [
+  'wishlist',
+  'applied',
+  'interview',
+  'offer',
+  'rejected',
+]
+
 type ResumeInspectorState =
   | { mode: 'detail'; resumeId: string }
   | {
@@ -105,6 +138,38 @@ function formatInspectorTime(value: string): string {
 
 function getResumeTitle(resume: StoredResume): string {
   return resume.resumeData.title || '未命名简历'
+}
+
+function sortApplicationsByUpdatedAt(items: ApplicationEntry[]): ApplicationEntry[] {
+  return [...items].sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+  )
+}
+
+function formatApplicationDate(value?: string, options?: Intl.DateTimeFormatOptions): string {
+  const normalized = value?.trim()
+  if (!normalized) {
+    return ''
+  }
+
+  const parsed = Date.parse(normalized)
+  if (Number.isNaN(parsed)) {
+    return normalized
+  }
+
+  return new Date(parsed).toLocaleString('zh-CN', options)
+}
+
+function formatApplicationStatusSummary(applications: ApplicationEntry[]): string {
+  const counts = new Map<ApplicationStatus, number>()
+
+  for (const application of applications) {
+    counts.set(application.status, (counts.get(application.status) ?? 0) + 1)
+  }
+
+  return APPLICATION_STATUS_ORDER.filter((status) => counts.has(status))
+    .map((status) => `${APPLICATION_STATUS_META[status].label} ${counts.get(status)}`)
+    .join(' · ')
 }
 
 function getPersonalInfoCount(resume: StoredResume): number {
@@ -252,6 +317,8 @@ export default function UserCenter() {
   const { toast } = useToast()
 
   const [items, setItems] = useState<StoredResume[]>([])
+  const [applications, setApplications] = useState<ApplicationEntry[]>([])
+  const [applicationsAvailable, setApplicationsAvailable] = useState(true)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [keyword, setKeyword] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('updatedAt')
@@ -261,10 +328,34 @@ export default function UserCenter() {
   const [inspector, setInspector] = useState<ResumeInspectorState | null>(null)
 
   const refresh = useCallback(async () => {
-    try {
-      setItems(await getAllResumes())
-    } catch (e) {
-      toast({ title: '读取失败', description: e instanceof Error ? e.message : '无法读取本地存储' })
+    const [resumesResult, applicationsResult] = await Promise.allSettled([
+      getAllResumes(),
+      getAllApplications(),
+    ])
+
+    if (resumesResult.status === 'fulfilled') {
+      setItems(resumesResult.value)
+    } else {
+      toast({
+        title: '读取失败',
+        description:
+          resumesResult.reason instanceof Error ? resumesResult.reason.message : '无法读取本地存储',
+      })
+    }
+
+    if (applicationsResult.status === 'fulfilled') {
+      setApplications(applicationsResult.value)
+      setApplicationsAvailable(true)
+    } else {
+      setApplications([])
+      setApplicationsAvailable(false)
+      toast({
+        title: '求职记录读取失败',
+        description:
+          applicationsResult.reason instanceof Error
+            ? `${applicationsResult.reason.message}，将暂不显示简历使用情况。`
+            : '将暂不显示简历使用情况。',
+      })
     }
   }, [toast])
 
@@ -336,6 +427,33 @@ export default function UserCenter() {
 
   const visibleIds = useMemo(() => filteredSorted.map((item) => item.id), [filteredSorted])
   const itemMap = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
+  const applicationMap = useMemo(
+    () => new Map(applications.map((application) => [application.id, application])),
+    [applications],
+  )
+  const applicationsByResumeId = useMemo(() => {
+    const map = new Map<string, ApplicationEntry[]>()
+
+    for (const application of applications) {
+      const resumeId = application.resumeId?.trim()
+      if (!resumeId) {
+        continue
+      }
+
+      const current = map.get(resumeId)
+      if (current) {
+        current.push(application)
+      } else {
+        map.set(resumeId, [application])
+      }
+    }
+
+    for (const [resumeId, linkedApplications] of map.entries()) {
+      map.set(resumeId, sortApplicationsByUpdatedAt(linkedApplications))
+    }
+
+    return map
+  }, [applications])
   const familyItemsMap = useMemo(() => {
     const map = new Map<string, StoredResume[]>()
 
@@ -374,6 +492,16 @@ export default function UserCenter() {
     () => (inspectorDetailResume ? getDetailMetadata(inspectorDetailResume) : null),
     [inspectorDetailResume],
   )
+  const inspectorDetailApplications = useMemo(
+    () =>
+      inspectorDetailResume ? (applicationsByResumeId.get(inspectorDetailResume.id) ?? []) : [],
+    [applicationsByResumeId, inspectorDetailResume],
+  )
+  const inspectorDetailSourceApplication = useMemo(() => {
+    const sourceApplicationId = inspectorDetailResume?.lineage.sourceApplicationId
+    return sourceApplicationId ? (applicationMap.get(sourceApplicationId) ?? null) : null
+  }, [applicationMap, inspectorDetailResume])
+  const inspectorDetailLatestApplication = inspectorDetailApplications[0] ?? null
   const inspectorCompareSummary = useMemo(() => {
     if (!inspectorCompareResumes?.left || !inspectorCompareResumes.right) {
       return null
@@ -903,6 +1031,28 @@ export default function UserCenter() {
                               <p>{getResumeLineageHint(it.lineage)}</p>
                             </div>
                           ) : null}
+                          {(applicationsByResumeId.get(it.id)?.length ?? 0) > 0 ||
+                          it.lineage.sourceApplicationId ||
+                          !applicationsAvailable ? (
+                            <div className="flex flex-wrap items-center gap-1.5 text-xs leading-5">
+                              {!applicationsAvailable ? (
+                                <Badge variant="outline" className="bg-background/70 text-[11px]">
+                                  求职记录暂未加载
+                                </Badge>
+                              ) : null}
+                              {(applicationsByResumeId.get(it.id)?.length ?? 0) > 0 ? (
+                                <Badge variant="outline" className="bg-background/70 text-[11px]">
+                                  <Icon icon="mdi:briefcase-outline" className="h-3 w-3" />
+                                  关联投递 {applicationsByResumeId.get(it.id)?.length}
+                                </Badge>
+                              ) : null}
+                              {it.lineage.sourceApplicationId ? (
+                                <Badge variant="secondary" className="text-[11px]">
+                                  来源岗位
+                                </Badge>
+                              ) : null}
+                            </div>
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell className="text-center text-xs">
@@ -1046,6 +1196,140 @@ export default function UserCenter() {
                       ))}
                     </div>
                   ) : null}
+                  <div className="bg-muted/20 space-y-4 rounded-xl border p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">使用情况</Badge>
+                      <span className="text-muted-foreground text-xs">
+                        {inspectorDetailApplications.length > 0
+                          ? `当前有 ${inspectorDetailApplications.length} 条求职记录引用此版本。`
+                          : applicationsAvailable
+                            ? '当前还没有求职记录引用此版本。'
+                            : '求职记录暂未加载，当前无法判断这份简历的使用情况。'}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="bg-background rounded-lg border px-3 py-2">
+                        <p className="text-muted-foreground text-[11px] leading-5">关联投递</p>
+                        <p className="text-sm font-medium">
+                          {applicationsAvailable
+                            ? `${inspectorDetailApplications.length} 条`
+                            : '暂不可用'}
+                        </p>
+                      </div>
+                      <div className="bg-background rounded-lg border px-3 py-2">
+                        <p className="text-muted-foreground text-[11px] leading-5">流程分布</p>
+                        <p className="text-sm font-medium break-words">
+                          {applicationsAvailable
+                            ? inspectorDetailApplications.length > 0
+                              ? formatApplicationStatusSummary(inspectorDetailApplications)
+                              : '暂无'
+                            : '暂不可用'}
+                        </p>
+                      </div>
+                      <div className="bg-background rounded-lg border px-3 py-2">
+                        <p className="text-muted-foreground text-[11px] leading-5">最近关联更新</p>
+                        <p className="text-sm font-medium break-words">
+                          {applicationsAvailable
+                            ? inspectorDetailLatestApplication
+                              ? formatInspectorTime(inspectorDetailLatestApplication.updatedAt)
+                              : '暂无'
+                            : '暂不可用'}
+                        </p>
+                      </div>
+                      <div className="bg-background rounded-lg border px-3 py-2">
+                        <p className="text-muted-foreground text-[11px] leading-5">来源岗位</p>
+                        <p className="text-sm font-medium break-words">
+                          {inspectorDetailSourceApplication
+                            ? `${inspectorDetailSourceApplication.company} · ${inspectorDetailSourceApplication.role}`
+                            : inspectorDetailResume.lineage.sourceApplicationId
+                              ? applicationsAvailable
+                                ? '来源岗位记录不可用'
+                                : '求职记录暂未加载'
+                              : '无'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {applicationsAvailable ? (
+                      inspectorDetailApplications.length > 0 ? (
+                        <div className="space-y-2">
+                          {inspectorDetailApplications.map((application) => (
+                            <div
+                              key={application.id}
+                              className="bg-background space-y-2 rounded-lg border px-4 py-3"
+                            >
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div className="min-w-0 space-y-1">
+                                  <p className="text-sm font-medium break-words">
+                                    {application.company} · {application.role}
+                                  </p>
+                                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                    <span>记录 {application.id.slice(0, 8)}</span>
+                                    {application.appliedAt ? (
+                                      <span>
+                                        投递{' '}
+                                        {formatApplicationDate(application.appliedAt, {
+                                          month: 'numeric',
+                                          day: 'numeric',
+                                        })}
+                                      </span>
+                                    ) : null}
+                                    <span>更新 {formatInspectorTime(application.updatedAt)}</span>
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                  <Badge
+                                    variant="outline"
+                                    className={
+                                      APPLICATION_STATUS_META[application.status].className
+                                    }
+                                  >
+                                    {APPLICATION_STATUS_META[application.status].label}
+                                  </Badge>
+                                  {application.source?.trim() ? (
+                                    <Badge variant="outline">
+                                      来源 {application.source.trim()}
+                                    </Badge>
+                                  ) : null}
+                                  {application.id ===
+                                  inspectorDetailResume.lineage.sourceApplicationId ? (
+                                    <Badge variant="secondary">来源岗位</Badge>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              {application.nextAction?.trim() ||
+                              application.followUpDate?.trim() ? (
+                                <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                  {application.nextAction?.trim() ? (
+                                    <span>下一步：{application.nextAction.trim()}</span>
+                                  ) : null}
+                                  {application.followUpDate?.trim() ? (
+                                    <span>
+                                      跟进：
+                                      {formatApplicationDate(application.followUpDate, {
+                                        month: 'numeric',
+                                        day: 'numeric',
+                                      })}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+                          后续在求职看板里关联到这份简历的投递记录，会自动出现在这里。
+                        </div>
+                      )
+                    ) : (
+                      <div className="text-muted-foreground rounded-lg border border-dashed p-4 text-sm">
+                        求职记录暂未加载，当前无法展示这份简历的关联投递明细。
+                      </div>
+                    )}
+                  </div>
                   {renderPreviewPanel(inspectorDetailResume, '当前版本')}
                 </>
               ) : (
