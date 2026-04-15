@@ -55,12 +55,189 @@ interface ResumeFamilyGroup {
   items: StoredResume[]
 }
 
+interface ResumeInspectorMetadataItem {
+  label: string
+  value: string
+}
+
+interface ResumeCompareSummary {
+  leftLabel: string
+  leftTitle: string
+  leftVariantLabel: string
+  rightLabel: string
+  rightTitle: string
+  rightVariantLabel: string
+  newerSide: 'left' | 'right' | 'same'
+  moduleDelta: number
+  sharedModuleTitles: string[]
+  leftOnlyModuleTitles: string[]
+  rightOnlyModuleTitles: string[]
+  personalInfoDelta: number
+  avatarChanged: boolean
+  jobIntentionChanged: boolean
+}
+
 type ResumeInspectorState =
   | { mode: 'detail'; resumeId: string }
-  | { mode: 'compare'; familyId: string; leftId: string; rightId: string }
+  | {
+      mode: 'compare'
+      familyId: string
+      leftId: string
+      rightId: string
+      leftLabel: string
+      rightLabel: string
+    }
 
 function getFamilyId(item: StoredResume): string {
   return item.lineage.familyId || item.id
+}
+
+function formatInspectorTime(value: string): string {
+  return new Date(value).toLocaleString()
+}
+
+function getResumeTitle(resume: StoredResume): string {
+  return resume.resumeData.title || '未命名简历'
+}
+
+function getPersonalInfoCount(resume: StoredResume): number {
+  return resume.resumeData.personalInfoSection?.personalInfo.length ?? 0
+}
+
+function getHasAvatar(resume: StoredResume): boolean {
+  return Boolean(resume.resumeData.avatar?.trim())
+}
+
+function getHasJobIntention(resume: StoredResume): boolean {
+  const section = resume.resumeData.jobIntentionSection
+
+  if (!section?.enabled) {
+    return false
+  }
+
+  return section.items.some((item) => {
+    const hasValue = Boolean(item.value.trim())
+    const hasSalaryRange = Boolean(item.salaryRange?.min || item.salaryRange?.max)
+    return hasValue || hasSalaryRange
+  })
+}
+
+function getModuleTitles(resume: StoredResume): string[] {
+  return resume.resumeData.modules
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((module) => module.title.trim() || '未命名模块')
+}
+
+function getModuleTitleCounts(titles: string[]): Map<string, number> {
+  const counts = new Map<string, number>()
+
+  for (const title of titles) {
+    counts.set(title, (counts.get(title) ?? 0) + 1)
+  }
+
+  return counts
+}
+
+function formatModuleTitleBadges(counts: Map<string, number>): string[] {
+  return Array.from(counts.entries()).map(([title, count]) =>
+    count > 1 ? `${title} ×${count}` : title,
+  )
+}
+
+function getJobIntentionSignature(resume: StoredResume): string {
+  const section = resume.resumeData.jobIntentionSection
+
+  if (!section?.enabled) {
+    return 'none'
+  }
+
+  const itemSignature = section.items
+    .slice()
+    .sort((a, b) => a.order - b.order)
+    .map((item) => {
+      const salaryRange = item.salaryRange
+        ? `${item.salaryRange.min ?? ''}-${item.salaryRange.max ?? ''}`
+        : ''
+      return [item.type, item.label, item.value.trim(), salaryRange].join(':')
+    })
+    .filter((signature) => signature.replace(/[:|]/g, '').trim().length > 0)
+    .join('|')
+
+  return itemSignature || 'none'
+}
+
+function getDetailMetadata(resume: StoredResume): ResumeInspectorMetadataItem[] {
+  return [
+    { label: '标题', value: getResumeTitle(resume) },
+    { label: '变体', value: getResumeVariantLabel(resume.lineage.variantKind) },
+    { label: '家族 ID（前 8 位）', value: getFamilyId(resume).slice(0, 8) },
+    { label: '谱系提示', value: getResumeLineageHint(resume.lineage) ?? '无额外提示' },
+    { label: '创建时间', value: formatInspectorTime(resume.createdAt) },
+    { label: '更新时间', value: formatInspectorTime(resume.updatedAt) },
+    { label: '模块数', value: `${resume.resumeData.modules.length}` },
+    { label: '个人信息项', value: `${getPersonalInfoCount(resume)}` },
+    { label: '求职意向', value: getHasJobIntention(resume) ? '有' : '无' },
+    { label: '头像', value: getHasAvatar(resume) ? '有' : '无' },
+  ]
+}
+
+function getCompareSummary(
+  left: StoredResume,
+  right: StoredResume,
+  leftLabel: string,
+  rightLabel: string,
+): ResumeCompareSummary {
+  const leftTitles = getModuleTitles(left)
+  const rightTitles = getModuleTitles(right)
+  const leftTitleCounts = getModuleTitleCounts(leftTitles)
+  const rightTitleCounts = getModuleTitleCounts(rightTitles)
+  const leftUpdatedAt = new Date(left.updatedAt).getTime()
+  const rightUpdatedAt = new Date(right.updatedAt).getTime()
+  const sharedCounts = new Map<string, number>()
+  const leftOnlyCounts = new Map<string, number>()
+  const rightOnlyCounts = new Map<string, number>()
+
+  for (const [title, leftCount] of leftTitleCounts.entries()) {
+    const rightCount = rightTitleCounts.get(title) ?? 0
+    const sharedCount = Math.min(leftCount, rightCount)
+
+    if (sharedCount > 0) {
+      sharedCounts.set(title, sharedCount)
+    }
+
+    if (leftCount > sharedCount) {
+      leftOnlyCounts.set(title, leftCount - sharedCount)
+    }
+  }
+
+  for (const [title, rightCount] of rightTitleCounts.entries()) {
+    const leftCount = leftTitleCounts.get(title) ?? 0
+    const sharedCount = Math.min(leftCount, rightCount)
+
+    if (rightCount > sharedCount) {
+      rightOnlyCounts.set(title, rightCount - sharedCount)
+    }
+  }
+
+  return {
+    leftLabel,
+    leftTitle: getResumeTitle(left),
+    leftVariantLabel: getResumeVariantLabel(left.lineage.variantKind),
+    rightLabel,
+    rightTitle: getResumeTitle(right),
+    rightVariantLabel: getResumeVariantLabel(right.lineage.variantKind),
+    newerSide:
+      leftUpdatedAt === rightUpdatedAt ? 'same' : leftUpdatedAt > rightUpdatedAt ? 'left' : 'right',
+    moduleDelta: right.resumeData.modules.length - left.resumeData.modules.length,
+    sharedModuleTitles: formatModuleTitleBadges(sharedCounts),
+    leftOnlyModuleTitles: formatModuleTitleBadges(leftOnlyCounts),
+    rightOnlyModuleTitles: formatModuleTitleBadges(rightOnlyCounts),
+    personalInfoDelta: getPersonalInfoCount(right) - getPersonalInfoCount(left),
+    avatarChanged:
+      (left.resumeData.avatar?.trim() ?? '') !== (right.resumeData.avatar?.trim() ?? ''),
+    jobIntentionChanged: getJobIntentionSignature(left) !== getJobIntentionSignature(right),
+  }
 }
 
 export default function UserCenter() {
@@ -186,6 +363,26 @@ export default function UserCenter() {
           right: itemMap.get(inspector.rightId) ?? null,
         }
       : null
+  const inspectorDetailMetadata = useMemo(
+    () => (inspectorDetailResume ? getDetailMetadata(inspectorDetailResume) : null),
+    [inspectorDetailResume],
+  )
+  const inspectorCompareSummary = useMemo(() => {
+    if (!inspectorCompareResumes?.left || !inspectorCompareResumes.right) {
+      return null
+    }
+
+    if (inspector?.mode !== 'compare') {
+      return null
+    }
+
+    return getCompareSummary(
+      inspectorCompareResumes.left,
+      inspectorCompareResumes.right,
+      inspector.leftLabel,
+      inspector.rightLabel,
+    )
+  }, [inspector, inspectorCompareResumes])
 
   const SortArrows = ({ field }: { field: SortKey }) => {
     const activeAsc = sortKey === field && sortDir === 'asc'
@@ -319,13 +516,25 @@ export default function UserCenter() {
     setInspector({ mode: 'detail', resumeId })
   }
 
-  const openCompareInspector = (familyId: string, leftId: string, rightId: string) => {
+  const openCompareInspector = (
+    familyId: string,
+    leftId: string,
+    rightId: string,
+    labels: { left: string; right: string },
+  ) => {
     if (leftId === rightId) {
       toast({ title: '无法对比', description: '请至少选择同家族中的两个不同版本。' })
       return
     }
 
-    setInspector({ mode: 'compare', familyId, leftId, rightId })
+    setInspector({
+      mode: 'compare',
+      familyId,
+      leftId,
+      rightId,
+      leftLabel: labels.left,
+      rightLabel: labels.right,
+    })
   }
 
   const handleCompareWithLatest = (resume: StoredResume) => {
@@ -346,7 +555,10 @@ export default function UserCenter() {
       return
     }
 
-    openCompareInspector(familyId, resume.id, target.id)
+    openCompareInspector(familyId, resume.id, target.id, {
+      left: '当前选择',
+      right: latest.id === resume.id ? '上一版' : '最新版本',
+    })
   }
 
   const handleCompareLatestTwo = (familyId: string) => {
@@ -357,7 +569,10 @@ export default function UserCenter() {
       return
     }
 
-    openCompareInspector(familyId, familyItems[1].id, familyItems[0].id)
+    openCompareInspector(familyId, familyItems[1].id, familyItems[0].id, {
+      left: '较早版本',
+      right: '较新版本',
+    })
   }
 
   const closeInspector = (open: boolean) => {
@@ -393,6 +608,27 @@ export default function UserCenter() {
             emptyStateMessage="当前版本暂无模块内容。"
           />
         </div>
+      </div>
+    </div>
+  )
+
+  const renderCompareModuleList = (
+    label: string,
+    titles: string[],
+    badgeVariant: 'secondary' | 'outline' = 'outline',
+  ) => (
+    <div className="space-y-2">
+      <p className="text-muted-foreground text-xs">{label}</p>
+      <div className="flex min-h-8 flex-wrap gap-1.5">
+        {titles.length > 0 ? (
+          titles.map((title) => (
+            <Badge key={`${label}-${title}`} variant={badgeVariant}>
+              {title}
+            </Badge>
+          ))
+        ) : (
+          <span className="text-muted-foreground text-xs">无</span>
+        )}
       </div>
     </div>
   )
@@ -761,7 +997,7 @@ export default function UserCenter() {
                       {getResumeVariantLabel(inspectorDetailResume.lineage.variantKind)}
                     </Badge>
                     <span className="text-muted-foreground text-xs">
-                      家族 {getFamilyId(inspectorDetailResume).slice(0, 8)}
+                      家族 ID（前 8 位） {getFamilyId(inspectorDetailResume).slice(0, 8)}
                     </span>
                     {getResumeLineageHint(inspectorDetailResume.lineage) ? (
                       <span className="text-muted-foreground text-xs">
@@ -769,6 +1005,18 @@ export default function UserCenter() {
                       </span>
                     ) : null}
                   </div>
+                  {inspectorDetailMetadata ? (
+                    <div className="bg-muted/20 grid gap-2 rounded-xl border p-3 sm:grid-cols-2 xl:grid-cols-5">
+                      {inspectorDetailMetadata.map((item) => (
+                        <div key={item.label} className="bg-background rounded-lg border px-3 py-2">
+                          <p className="text-muted-foreground text-[11px] leading-5">
+                            {item.label}
+                          </p>
+                          <p className="text-sm font-medium break-all">{item.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                   {renderPreviewPanel(inspectorDetailResume, '当前版本')}
                 </>
               ) : (
@@ -784,12 +1032,108 @@ export default function UserCenter() {
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="secondary">对比</Badge>
                     <span className="text-muted-foreground text-xs">
-                      家族 {inspector.familyId.slice(0, 8)}
+                      家族 ID（前 8 位） {inspector.familyId.slice(0, 8)}
                     </span>
                   </div>
+                  {inspectorCompareSummary ? (
+                    <div className="bg-muted/20 space-y-4 rounded-xl border p-4">
+                      <div className="grid gap-3 lg:grid-cols-2">
+                        <div className="bg-background rounded-lg border px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">{inspectorCompareSummary.leftLabel}</Badge>
+                            <Badge variant="outline">
+                              {inspectorCompareSummary.leftVariantLabel}
+                            </Badge>
+                          </div>
+                          <p className="mt-2 text-sm font-medium">
+                            {inspectorCompareSummary.leftTitle}
+                          </p>
+                        </div>
+                        <div className="bg-background rounded-lg border px-4 py-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">{inspectorCompareSummary.rightLabel}</Badge>
+                            <Badge variant="outline">
+                              {inspectorCompareSummary.rightVariantLabel}
+                            </Badge>
+                          </div>
+                          <p className="mt-2 text-sm font-medium">
+                            {inspectorCompareSummary.rightTitle}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+                        <div className="bg-background rounded-lg border px-3 py-2">
+                          <p className="text-muted-foreground text-[11px] leading-5">较新版本</p>
+                          <p className="text-sm font-medium">
+                            {inspectorCompareSummary.newerSide === 'same'
+                              ? '两侧同步'
+                              : inspectorCompareSummary.newerSide === 'left'
+                                ? '左侧较新'
+                                : '右侧较新'}
+                          </p>
+                        </div>
+                        <div className="bg-background rounded-lg border px-3 py-2">
+                          <p className="text-muted-foreground text-[11px] leading-5">模块数变化</p>
+                          <p className="text-sm font-medium">
+                            {inspectorCompareResumes.left.resumeData.modules.length} →{' '}
+                            {inspectorCompareResumes.right.resumeData.modules.length} (
+                            {inspectorCompareSummary.moduleDelta > 0 ? '+' : ''}
+                            {inspectorCompareSummary.moduleDelta})
+                          </p>
+                        </div>
+                        <div className="bg-background rounded-lg border px-3 py-2">
+                          <p className="text-muted-foreground text-[11px] leading-5">
+                            个人信息项变化
+                          </p>
+                          <p className="text-sm font-medium">
+                            {getPersonalInfoCount(inspectorCompareResumes.left)} →{' '}
+                            {getPersonalInfoCount(inspectorCompareResumes.right)} (
+                            {inspectorCompareSummary.personalInfoDelta > 0 ? '+' : ''}
+                            {inspectorCompareSummary.personalInfoDelta})
+                          </p>
+                        </div>
+                        <div className="bg-background rounded-lg border px-3 py-2">
+                          <p className="text-muted-foreground text-[11px] leading-5">头像状态</p>
+                          <p className="text-sm font-medium">
+                            {inspectorCompareSummary.avatarChanged ? '已变化' : '未变化'}
+                          </p>
+                        </div>
+                        <div className="bg-background rounded-lg border px-3 py-2">
+                          <p className="text-muted-foreground text-[11px] leading-5">求职意向</p>
+                          <p className="text-sm font-medium">
+                            {inspectorCompareSummary.jobIntentionChanged ? '已变化' : '未变化'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-3 xl:grid-cols-3">
+                        {renderCompareModuleList(
+                          '共享模块',
+                          inspectorCompareSummary.sharedModuleTitles,
+                          'secondary',
+                        )}
+                        {renderCompareModuleList(
+                          '仅左侧模块',
+                          inspectorCompareSummary.leftOnlyModuleTitles,
+                        )}
+                        {renderCompareModuleList(
+                          '仅右侧模块',
+                          inspectorCompareSummary.rightOnlyModuleTitles,
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="flex flex-col gap-6 xl:grid xl:grid-cols-2 xl:items-start">
-                    {renderPreviewPanel(inspectorCompareResumes.left, '当前选择')}
-                    {renderPreviewPanel(inspectorCompareResumes.right, '对比目标', 'right')}
+                    {renderPreviewPanel(
+                      inspectorCompareResumes.left,
+                      inspectorCompareSummary?.leftLabel ?? '左侧版本',
+                    )}
+                    {renderPreviewPanel(
+                      inspectorCompareResumes.right,
+                      inspectorCompareSummary?.rightLabel ?? '右侧版本',
+                      'right',
+                    )}
                   </div>
                 </>
               ) : (
