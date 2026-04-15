@@ -17,6 +17,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Icon } from '@iconify/react'
 import { useToast } from '@/hooks/use-toast'
+import ResumePreview from '@/components/resume-preview'
 import type { StoredResume } from '@/types/resume'
 import {
   StorageError,
@@ -36,6 +37,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import ExportButton from '@/components/export-button'
 import { getResumeLineageHint, getResumeVariantLabel } from '@/lib/resume-lineage'
 
@@ -46,6 +54,10 @@ interface ResumeFamilyGroup {
   familyId: string
   items: StoredResume[]
 }
+
+type ResumeInspectorState =
+  | { mode: 'detail'; resumeId: string }
+  | { mode: 'compare'; familyId: string; leftId: string; rightId: string }
 
 function getFamilyId(item: StoredResume): string {
   return item.lineage.familyId || item.id
@@ -62,6 +74,7 @@ export default function UserCenter() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [inspector, setInspector] = useState<ResumeInspectorState | null>(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -138,11 +151,41 @@ export default function UserCenter() {
   }, [items])
 
   const visibleIds = useMemo(() => filteredSorted.map((item) => item.id), [filteredSorted])
+  const itemMap = useMemo(() => new Map(items.map((item) => [item.id, item])), [items])
+  const familyItemsMap = useMemo(() => {
+    const map = new Map<string, StoredResume[]>()
+
+    for (const item of items) {
+      const familyId = getFamilyId(item)
+      const current = map.get(familyId)
+
+      if (current) {
+        current.push(item)
+      } else {
+        map.set(familyId, [item])
+      }
+    }
+
+    for (const familyItems of map.values()) {
+      familyItems.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    }
+
+    return map
+  }, [items])
   const visibleSelectedIds = useMemo(
     () => visibleIds.filter((id) => selected.has(id)),
     [selected, visibleIds],
   )
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.has(id))
+  const inspectorDetailResume =
+    inspector?.mode === 'detail' ? (itemMap.get(inspector.resumeId) ?? null) : null
+  const inspectorCompareResumes =
+    inspector?.mode === 'compare'
+      ? {
+          left: itemMap.get(inspector.leftId) ?? null,
+          right: itemMap.get(inspector.rightId) ?? null,
+        }
+      : null
 
   const SortArrows = ({ field }: { field: SortKey }) => {
     const activeAsc = sortKey === field && sortDir === 'asc'
@@ -271,6 +314,88 @@ export default function UserCenter() {
       })
     }
   }
+
+  const openDetailInspector = (resumeId: string) => {
+    setInspector({ mode: 'detail', resumeId })
+  }
+
+  const openCompareInspector = (familyId: string, leftId: string, rightId: string) => {
+    if (leftId === rightId) {
+      toast({ title: '无法对比', description: '请至少选择同家族中的两个不同版本。' })
+      return
+    }
+
+    setInspector({ mode: 'compare', familyId, leftId, rightId })
+  }
+
+  const handleCompareWithLatest = (resume: StoredResume) => {
+    const familyId = getFamilyId(resume)
+    const familyItems = familyItemsMap.get(familyId) ?? []
+
+    if (familyItems.length < 2) {
+      toast({ title: '暂无可对比版本', description: '该版本家族当前只有一份简历。' })
+      return
+    }
+
+    const latest = familyItems[0]
+    const fallback = familyItems[1]
+    const target = latest.id === resume.id ? fallback : latest
+
+    if (!target) {
+      toast({ title: '无法对比', description: '未找到适合的对比版本，请稍后重试。' })
+      return
+    }
+
+    openCompareInspector(familyId, resume.id, target.id)
+  }
+
+  const handleCompareLatestTwo = (familyId: string) => {
+    const familyItems = familyItemsMap.get(familyId) ?? []
+
+    if (familyItems.length < 2) {
+      toast({ title: '暂无可对比版本', description: '该版本家族当前只有一份简历。' })
+      return
+    }
+
+    openCompareInspector(familyId, familyItems[1].id, familyItems[0].id)
+  }
+
+  const closeInspector = (open: boolean) => {
+    if (!open) setInspector(null)
+  }
+
+  const renderPreviewPanel = (
+    resume: StoredResume,
+    label: string,
+    align: 'left' | 'right' = 'left',
+  ) => (
+    <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="bg-muted/40 rounded-lg border px-4 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="secondary">{label}</Badge>
+          <span className="text-sm font-medium">{resume.resumeData.title || '未命名简历'}</span>
+          <Badge variant="outline">{getResumeVariantLabel(resume.lineage.variantKind)}</Badge>
+        </div>
+        <div
+          className={`text-muted-foreground mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${align === 'right' ? 'xl:justify-end' : ''}`}
+        >
+          <span>更新时间：{new Date(resume.updatedAt).toLocaleString()}</span>
+          <span>家族：{getFamilyId(resume).slice(0, 8)}</span>
+          {getResumeLineageHint(resume.lineage) ? (
+            <span>{getResumeLineageHint(resume.lineage)}</span>
+          ) : null}
+        </div>
+      </div>
+      <div className="bg-muted/20 overflow-x-auto rounded-xl border p-3">
+        <div className="mx-auto w-[210mm] max-w-full bg-white shadow-sm">
+          <ResumePreview
+            resumeData={resume.resumeData}
+            emptyStateMessage="当前版本暂无模块内容。"
+          />
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="bg-background min-h-screen">
@@ -456,17 +581,31 @@ export default function UserCenter() {
                 <Fragment key={group.familyId}>
                   <TableRow className="bg-muted/20 hover:bg-muted/20">
                     <TableCell colSpan={7} className="py-2">
-                      <div className="flex items-center gap-2 text-xs">
-                        <Badge variant="secondary">家族</Badge>
-                        <span className="font-medium">{group.familyId.slice(0, 8)}</span>
-                        <span className="text-muted-foreground">
-                          {(() => {
-                            const totalCount = familySizes.get(group.familyId) ?? group.items.length
-                            return totalCount === group.items.length
-                              ? `共 ${totalCount} 份简历`
-                              : `显示 ${group.items.length} / 共 ${totalCount} 份简历`
-                          })()}
-                        </span>
+                      <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary">家族</Badge>
+                          <span className="font-medium">{group.familyId.slice(0, 8)}</span>
+                          <span className="text-muted-foreground">
+                            {(() => {
+                              const totalCount =
+                                familySizes.get(group.familyId) ?? group.items.length
+                              return totalCount === group.items.length
+                                ? `共 ${totalCount} 份简历`
+                                : `显示 ${group.items.length} / 共 ${totalCount} 份简历`
+                            })()}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 gap-1.5 px-2 text-xs"
+                            onClick={() => handleCompareLatestTwo(group.familyId)}
+                            disabled={(familySizes.get(group.familyId) ?? group.items.length) < 2}
+                          >
+                            <Icon icon="mdi:compare-horizontal" className="h-4 w-4" /> 对比最近两版
+                          </Button>
+                        </div>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -517,7 +656,21 @@ export default function UserCenter() {
                         {new Date(it.updatedAt).toLocaleString()}
                       </TableCell>
                       <TableCell className="w-[360px] text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            className="gap-2"
+                            onClick={() => openDetailInspector(it.id)}
+                          >
+                            <Icon icon="mdi:dock-window" className="h-4 w-4" /> 详情
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="gap-2"
+                            onClick={() => handleCompareWithLatest(it)}
+                          >
+                            <Icon icon="mdi:compare-horizontal" className="h-4 w-4" /> 对比
+                          </Button>
                           <Button
                             variant="ghost"
                             className="gap-2"
@@ -583,6 +736,71 @@ export default function UserCenter() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Sheet open={inspector !== null} onOpenChange={closeInspector}>
+        <SheetContent
+          side="right"
+          className="w-full gap-0 overflow-y-auto sm:max-w-none xl:max-w-[min(96vw,1800px)]"
+        >
+          <SheetHeader className="border-b pr-12 pb-4">
+            <SheetTitle>{inspector?.mode === 'compare' ? '版本对比' : '版本详情'}</SheetTitle>
+            <SheetDescription>
+              {inspector?.mode === 'compare'
+                ? `同一家族内并排查看两个版本，快速判断迭代方向。`
+                : '在当前页快速查看版本内容与谱系信息，无需跳转路由。'}
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-4 p-4 md:p-6">
+            {inspector?.mode === 'detail' ? (
+              inspectorDetailResume ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary">详情</Badge>
+                    <Badge variant="outline">
+                      {getResumeVariantLabel(inspectorDetailResume.lineage.variantKind)}
+                    </Badge>
+                    <span className="text-muted-foreground text-xs">
+                      家族 {getFamilyId(inspectorDetailResume).slice(0, 8)}
+                    </span>
+                    {getResumeLineageHint(inspectorDetailResume.lineage) ? (
+                      <span className="text-muted-foreground text-xs">
+                        {getResumeLineageHint(inspectorDetailResume.lineage)}
+                      </span>
+                    ) : null}
+                  </div>
+                  {renderPreviewPanel(inspectorDetailResume, '当前版本')}
+                </>
+              ) : (
+                <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-sm">
+                  当前查看的版本不存在，可能已被删除，请关闭面板后重新选择。
+                </div>
+              )
+            ) : null}
+
+            {inspector?.mode === 'compare' && inspectorCompareResumes ? (
+              inspectorCompareResumes.left && inspectorCompareResumes.right ? (
+                <>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary">对比</Badge>
+                    <span className="text-muted-foreground text-xs">
+                      家族 {inspector.familyId.slice(0, 8)}
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-6 xl:grid xl:grid-cols-2 xl:items-start">
+                    {renderPreviewPanel(inspectorCompareResumes.left, '当前选择')}
+                    {renderPreviewPanel(inspectorCompareResumes.right, '对比目标', 'right')}
+                  </div>
+                </>
+              ) : (
+                <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-sm">
+                  对比对象不存在，可能已被删除，请关闭面板后重新选择。
+                </div>
+              )
+            ) : null}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

@@ -6,12 +6,16 @@ import RichTextRenderer from './rich-text-renderer'
 
 interface ResumePreviewProps {
   resumeData: ResumeData
+  emptyStateMessage?: string
 }
 
 /**
  * 简历预览组件
  */
-function ResumePreview({ resumeData }: ResumePreviewProps) {
+function ResumePreview({
+  resumeData,
+  emptyStateMessage = '暂无简历内容，请在左侧编辑区域添加模块',
+}: ResumePreviewProps) {
   const sanitizeIcon = (html: string) =>
     DOMPurify.sanitize(html, {
       ADD_TAGS: [
@@ -601,7 +605,7 @@ function ResumePreview({ resumeData }: ResumePreviewProps) {
       {resumeData.modules.length === 0 && (
         <div className="text-muted-foreground no-print py-12 text-center">
           <Icon icon="mdi:file-document-outline" className="mx-auto mb-4 h-12 w-12 opacity-50" />
-          <p>暂无简历内容，请在左侧编辑区域添加模块</p>
+          <p>{emptyStateMessage}</p>
         </div>
       )}
     </div>
