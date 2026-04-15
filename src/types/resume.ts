@@ -83,21 +83,31 @@ export interface JobIntentionSection {
 }
 
 // Tiptap JSON Content 类型（从 @tiptap/core 导入）
+/**
+ * Represents a Tiptap mark (text styling annotation).
+ * The root-level index signature is intentionally omitted — marks
+ * only carry `type`, optional `attrs`, and a literal `inline` flag.
+ */
+export interface RichTextMark {
+  type: string
+  attrs?: Record<string, unknown>
+}
+
+/**
+ * Tiptap JSON document node. The `[key: string]: unknown` index
+ * signature is required because Tiptap extensions (lists, images,
+ * code blocks, etc.) add their own node-specific fields that cannot
+ * be enumerated upfront.  Prefer accessing known fields (`type`,
+ * `attrs`, `content`, `marks`, `text`) directly; cast through
+ * `Record<string, unknown>` when you need dynamic key access.
+ */
 export interface JSONContent {
   type?: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  attrs?: Record<string, any>
+  attrs?: Record<string, unknown>
   content?: JSONContent[]
-  marks?: {
-    type: string
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    attrs?: Record<string, any>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    [key: string]: any
-  }[]
+  marks?: RichTextMark[]
   text?: string
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any
+  [key: string]: unknown
 }
 
 // 内容元素 - 一行中的一列（使用 Tiptap JSON 格式）
@@ -193,9 +203,6 @@ export interface StoredResume {
   /** 版本谱系信息 */
   lineage: ResumeLineage
 }
-
-/** 本地存储使用的 Key */
-export const LOCAL_STORAGE_KEY = 'resume.entries'
 
 /**
  * 文件保存/导入的数据结构

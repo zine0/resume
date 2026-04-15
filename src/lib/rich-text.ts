@@ -1,7 +1,5 @@
 import type { JSONContent } from '@/types/resume'
 
-type RichTextMark = NonNullable<JSONContent['marks']>[number]
-
 function removeEmptyValues(attrs: Record<string, unknown>): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(attrs).filter(
@@ -48,3 +46,4 @@ export function stripFontFamilyFromRichContent(content: JSONContent): JSONConten
     ...(children ? { content: children } : {}),
   }
 }
+import type { RichTextMark } from '@/types/resume'
