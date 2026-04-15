@@ -1,4 +1,4 @@
-use headless_chrome::{Browser, types::PrintToPdfOptions};
+use headless_chrome::{types::PrintToPdfOptions, Browser};
 use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};

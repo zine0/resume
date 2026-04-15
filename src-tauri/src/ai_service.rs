@@ -332,7 +332,8 @@ pub async fn ai_analyze_jd(
         .collect::<HashMap<_, _>>();
 
     for suggestion in &parsed.suggestions {
-        let (Some(target_kind), Some(target_id)) = (&suggestion.target_kind, &suggestion.target_id) else {
+        let (Some(target_kind), Some(target_id)) = (&suggestion.target_kind, &suggestion.target_id)
+        else {
             continue;
         };
 
@@ -505,7 +506,10 @@ pub fn jd_suggestion_module_title() -> &'static str {
     JD_SUGGESTION_MODULE_TITLE
 }
 
-fn build_optimization_summary(_summary: &str, preview_items: &[AiOptimizationPreviewItem]) -> String {
+fn build_optimization_summary(
+    _summary: &str,
+    preview_items: &[AiOptimizationPreviewItem],
+) -> String {
     if preview_items.is_empty() {
         "AI 已完成优化预览，当前未发现可展示的文本差异，确认后仍会基于补丁创建新的优化副本。"
             .to_string()
@@ -572,7 +576,10 @@ fn build_optimization_change_groups(
     let mut groups: Vec<AiOptimizationChangeGroup> = Vec::new();
 
     for item in preview_items {
-        if let Some(group) = groups.iter_mut().find(|group| group.section == item.section) {
+        if let Some(group) = groups
+            .iter_mut()
+            .find(|group| group.section == item.section)
+        {
             group.items.push(item.clone());
         } else {
             groups.push(AiOptimizationChangeGroup {
@@ -593,7 +600,10 @@ fn operation_changes_target(target: &EditableTargetSnapshot, operation: &AiPatch
         AiPatchContentKind::Salary => {
             normalize_preview_text(&target.original_text)
                 != normalize_preview_text(&preview_text_for_operation(operation))
-                || !salary_ranges_match(target.salary_range.as_ref(), operation.salary_range.as_ref())
+                || !salary_ranges_match(
+                    target.salary_range.as_ref(),
+                    operation.salary_range.as_ref(),
+                )
         }
         AiPatchContentKind::Plain | AiPatchContentKind::Markdown => {
             normalize_preview_text(&target.original_text)

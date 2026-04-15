@@ -47,7 +47,10 @@ pub fn run() {
             pdf::generate_pdf,
         ])
         .setup(|app| {
-            let data_dir = app.path().app_data_dir().expect("failed to resolve app data dir");
+            let data_dir = app
+                .path()
+                .app_data_dir()
+                .expect("failed to resolve app data dir");
             std::fs::create_dir_all(&data_dir).expect("failed to create app data dir");
             Ok(())
         });

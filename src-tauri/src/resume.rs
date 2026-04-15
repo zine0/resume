@@ -187,7 +187,6 @@ pub enum ResumeVariantKind {
     JdTailored,
 }
 
-
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResumeLineage {
