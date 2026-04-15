@@ -65,6 +65,26 @@ interface StatusMeta {
   emptyCopy: string
 }
 
+interface AttentionCue {
+  label: string
+  icon: string
+  tone: string
+  kind:
+    | 'overdue'
+    | 'today'
+    | 'upcoming'
+    | 'pending'
+    | 'completed'
+    | 'snoozed'
+    | 'waiting'
+    | 'blocked'
+    | 'active'
+}
+
+function isActionableReminderKind(kind: AttentionCue['kind']) {
+  return kind === 'overdue' || kind === 'today' || kind === 'upcoming' || kind === 'pending'
+}
+
 const STATUS_ORDER: ApplicationStatus[] = ['wishlist', 'applied', 'interview', 'offer', 'rejected']
 
 const STATUS_META: Record<ApplicationStatus, StatusMeta> = {
@@ -144,6 +164,149 @@ function formatDateLabel(value: string) {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function parseLooseDate(value?: string) {
+  const normalized = value?.trim()
+  if (!normalized) {
+    return null
+  }
+
+  const timestamp = Date.parse(normalized)
+  if (Number.isNaN(timestamp)) {
+    return null
+  }
+
+  return new Date(timestamp)
+}
+
+function formatLooseDate(value?: string, options?: Intl.DateTimeFormatOptions) {
+  const normalized = value?.trim()
+  if (!normalized) {
+    return ''
+  }
+
+  const parsed = parseLooseDate(normalized)
+  if (!parsed) {
+    return normalized
+  }
+
+  return parsed.toLocaleString('zh-CN', options)
+}
+
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function getReminderCue(application: ApplicationEntry, today = new Date()): AttentionCue | null {
+  const followUpDate = application.followUpDate?.trim()
+  const reminderStatus = application.reminderStatus
+
+  if (reminderStatus === 'completed') {
+    return {
+      kind: 'completed',
+      icon: 'mdi:check-circle-outline',
+      label: followUpDate
+        ? `跟进已完成 · ${formatLooseDate(followUpDate, { month: 'numeric', day: 'numeric' })}`
+        : '跟进已完成',
+      tone: 'border-border bg-muted/50 text-muted-foreground',
+    }
+  }
+
+  if (reminderStatus === 'snoozed') {
+    return {
+      kind: 'snoozed',
+      icon: 'mdi:bell-sleep-outline',
+      label: followUpDate
+        ? `提醒暂缓 · ${formatLooseDate(followUpDate, { month: 'numeric', day: 'numeric' })}`
+        : '提醒暂缓',
+      tone: 'border-border bg-muted/50 text-muted-foreground',
+    }
+  }
+
+  if (!followUpDate) {
+    return application.nextAction?.trim()
+      ? {
+          kind: 'pending',
+          icon: 'mdi:arrow-right-circle-outline',
+          label: '待执行动作',
+          tone: 'border-primary/15 bg-primary/5 text-primary',
+        }
+      : null
+  }
+
+  const parsedDate = parseLooseDate(followUpDate)
+  if (!parsedDate) {
+    return {
+      kind: 'pending',
+      icon: 'mdi:bell-outline',
+      label: `待跟进 · ${followUpDate}`,
+      tone: 'border-primary/15 bg-primary/5 text-primary',
+    }
+  }
+
+  const followUpDay = startOfDay(parsedDate).getTime()
+  const todayStart = startOfDay(today).getTime()
+
+  if (followUpDay < todayStart) {
+    return {
+      kind: 'overdue',
+      icon: 'mdi:bell-alert-outline',
+      label: `逾期跟进 · ${formatLooseDate(followUpDate, { month: 'numeric', day: 'numeric' })}`,
+      tone: 'border-destructive/20 bg-destructive/8 text-destructive',
+    }
+  }
+
+  if (followUpDay === todayStart) {
+    return {
+      kind: 'today',
+      icon: 'mdi:calendar-clock-outline',
+      label: '今天要跟进',
+      tone: 'border-chart-2/20 bg-chart-2/10 text-chart-2',
+    }
+  }
+
+  return {
+    kind: 'upcoming',
+    icon: 'mdi:calendar-arrow-right-outline',
+    label: `下次跟进 · ${formatLooseDate(followUpDate, { month: 'numeric', day: 'numeric' })}`,
+    tone: 'border-border bg-muted/50 text-muted-foreground',
+  }
+}
+
+function getReviewCue(application: ApplicationEntry): AttentionCue | null {
+  const blockedReason = application.blockedReason?.trim()
+
+  if (application.reviewStatus === 'blocked' || blockedReason) {
+    return {
+      kind: 'blocked',
+      icon: 'mdi:alert-octagon-outline',
+      label: blockedReason ? '流程阻塞，待处理原因' : '流程阻塞',
+      tone: 'border-destructive/20 bg-destructive/8 text-destructive',
+    }
+  }
+
+  if (application.reviewStatus === 'waiting') {
+    return {
+      kind: 'waiting',
+      icon: 'mdi:timer-sand',
+      label: application.lastContactAt?.trim()
+        ? `等待反馈 · 最近联系 ${formatLooseDate(application.lastContactAt, { month: 'numeric', day: 'numeric' })}`
+        : '等待反馈',
+      tone: 'border-chart-3/20 bg-chart-3/10 text-chart-3',
+    }
+  }
+
+  if (application.reviewStatus === 'active') {
+    return {
+      kind: 'active',
+      icon: 'mdi:progress-check',
+      label: '流程推进中',
+      tone: 'border-primary/15 bg-primary/5 text-primary',
+    }
+  }
+
+  return null
 }
 
 function isApplicationStatus(value: string): value is ApplicationStatus {
@@ -296,37 +459,56 @@ export default function ApplicationBoard() {
     )
   }, [filteredApplications])
 
-  const summaryCards = useMemo(
-    () => [
+  const summaryCards = useMemo(() => {
+    const today = new Date()
+    const visibleApplications = filteredApplications
+    const reminderKinds = visibleApplications.map(
+      (item) => getReminderCue(item, today)?.kind ?? null,
+    )
+    const overdueFollowUps = visibleApplications.filter(
+      (item) => getReminderCue(item, today)?.kind === 'overdue',
+    ).length
+    const actionableItems = reminderKinds.filter(
+      (kind): kind is AttentionCue['kind'] => kind !== null && isActionableReminderKind(kind),
+    ).length
+    const waitingFeedback = visibleApplications.filter(
+      (item) => getReviewCue(item)?.kind === 'waiting',
+    ).length
+    const blockedItems = visibleApplications.filter(
+      (item) => getReviewCue(item)?.kind === 'blocked',
+    ).length
+
+    return [
       {
-        label: '总记录',
-        value: applications.length,
-        icon: 'mdi:view-dashboard-outline',
-        tone: 'bg-primary/5 border-primary/15 text-primary',
+        label: '逾期跟进',
+        value: overdueFollowUps,
+        description: overdueFollowUps > 0 ? '优先催进度或补动作' : '当前没有逾期事项',
+        icon: 'mdi:bell-alert-outline',
+        tone: 'bg-destructive/8 border-destructive/15 text-destructive',
       },
       {
-        label: '推进中',
-        value: applications.filter((item) =>
-          ['wishlist', 'applied', 'interview'].includes(item.status),
-        ).length,
-        icon: 'mdi:progress-check',
+        label: '待处理动作',
+        value: actionableItems,
+        description: actionableItems > 0 ? '含今日、即将到期与待补动作' : '当前没有待处理动作',
+        icon: 'mdi:clipboard-check-outline',
         tone: 'bg-chart-2/10 border-chart-2/20 text-chart-2',
       },
       {
-        label: '面试阶段',
-        value: applications.filter((item) => item.status === 'interview').length,
-        icon: 'mdi:account-voice-outline',
+        label: '等待反馈',
+        value: waitingFeedback,
+        description: waitingFeedback > 0 ? '可查看最近联系并安排催问' : '当前没有待回复记录',
+        icon: 'mdi:timer-sand',
         tone: 'bg-chart-3/10 border-chart-3/18 text-chart-3',
       },
       {
-        label: 'Offer',
-        value: applications.filter((item) => item.status === 'offer').length,
-        icon: 'mdi:medal-outline',
-        tone: 'bg-chart-4/10 border-chart-4/22 text-chart-4',
+        label: '阻塞中',
+        value: blockedItems,
+        description: blockedItems > 0 ? '先处理原因再继续推进' : '当前没有阻塞记录',
+        icon: 'mdi:alert-octagon-outline',
+        tone: 'bg-primary/5 border-primary/15 text-primary',
       },
-    ],
-    [applications],
-  )
+    ]
+  }, [filteredApplications])
 
   const handleSubmit = async (values: ApplicationInput) => {
     setSubmitting(true)
@@ -531,139 +713,198 @@ export default function ApplicationBoard() {
     onEdit,
     onDelete,
     onTailor,
-  }: RenderApplicationCardArgs) => (
-    <div
-      ref={setRef}
-      style={{
-        ...style,
-        ...(fixedWidth ? { width: fixedWidth } : {}),
-        ...(isDragging ? { zIndex: 1100 } : {}),
-      }}
-      className={cn('whitespace-normal transition-transform', isDragging && 'rotate-[1deg]')}
-    >
-      <Card
-        className={cn(
-          'gap-3 p-4',
-          currentMovingId === application.id && 'opacity-70',
-          isDragging && 'shadow-2xl',
-          previewOnly && 'pointer-events-none',
-        )}
+  }: RenderApplicationCardArgs) => {
+    const reminderCue = getReminderCue(application)
+    const actionReminderCue =
+      reminderCue && isActionableReminderKind(reminderCue.kind) ? reminderCue : null
+    const reviewCue = getReviewCue(application)
+    const blockedReason = application.blockedReason?.trim()
+    const sourceLabel = application.source?.trim()
+    const resultLabel = application.result?.trim()
+    const lastContactLabel = application.lastContactAt?.trim()
+
+    return (
+      <div
+        ref={setRef}
+        style={{
+          ...style,
+          ...(fixedWidth ? { width: fixedWidth } : {}),
+          ...(isDragging ? { zIndex: 1100 } : {}),
+        }}
+        className={cn('whitespace-normal transition-transform', isDragging && 'rotate-[1deg]')}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2">
-            {dragHandle ? <div className="shrink-0">{dragHandle}</div> : null}
-            <div className="space-y-1">
-              <p className="text-base leading-tight font-semibold">{application.company}</p>
-              <p className="text-muted-foreground text-sm">{application.role}</p>
+        <Card
+          className={cn(
+            'gap-3 p-4',
+            currentMovingId === application.id && 'opacity-70',
+            isDragging && 'shadow-2xl',
+            previewOnly && 'pointer-events-none',
+          )}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2">
+              {dragHandle ? <div className="shrink-0">{dragHandle}</div> : null}
+              <div className="space-y-1">
+                <p className="text-base leading-tight font-semibold">{application.company}</p>
+                <p className="text-muted-foreground text-sm">{application.role}</p>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-1">
-            {application.url ? (
+            <div className="flex items-center gap-1">
+              {application.url ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-8"
+                  onClick={() => window.open(application.url, '_blank', 'noopener,noreferrer')}
+                  disabled={previewOnly}
+                >
+                  <Icon icon="mdi:open-in-new" className="h-4 w-4" />
+                </Button>
+              ) : null}
               <Button
                 variant="ghost"
                 size="icon"
                 className="size-8"
-                onClick={() => window.open(application.url, '_blank', 'noopener,noreferrer')}
+                onClick={() => onEdit(application)}
                 disabled={previewOnly}
               >
-                <Icon icon="mdi:open-in-new" className="h-4 w-4" />
+                <Icon icon="mdi:pencil-outline" className="h-4 w-4" />
               </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:bg-destructive size-8 hover:text-white"
+                onClick={() => onDelete(application)}
+                disabled={previewOnly}
+              >
+                <Icon icon="mdi:trash-can-outline" className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {linkedResumeTitle ? (
+              <Badge
+                variant="outline"
+                className="border-primary/20 bg-primary/5 text-primary max-w-full min-w-0 gap-1 overflow-hidden"
+              >
+                <span className="shrink-0">简历 ·</span>
+                <span className="min-w-0 truncate">{linkedResumeTitle}</span>
+              </Badge>
             ) : null}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              onClick={() => onEdit(application)}
-              disabled={previewOnly}
+            {application.resumeId && resumeMap.get(application.resumeId) ? (
+              <Badge variant="outline">
+                {getResumeVariantLabel(resumeMap.get(application.resumeId)!.lineage.variantKind)}
+              </Badge>
+            ) : null}
+            {sourceLabel ? <Badge variant="outline">来源 {sourceLabel}</Badge> : null}
+            {resultLabel ? <Badge variant="outline">结果 {resultLabel}</Badge> : null}
+            {application.appliedAt ? (
+              <Badge variant="outline">投递于 {application.appliedAt}</Badge>
+            ) : null}
+            {reminderCue ? (
+              <Badge variant="outline" className={reminderCue.tone}>
+                <Icon icon={reminderCue.icon} className="h-3 w-3" />
+                {reminderCue.label}
+              </Badge>
+            ) : null}
+            {reviewCue ? (
+              <Badge variant="outline" className={reviewCue.tone}>
+                <Icon icon={reviewCue.icon} className="h-3 w-3" />
+                {reviewCue.label}
+              </Badge>
+            ) : null}
+            {application.status === 'interview' && application.interviewStage ? (
+              <Badge variant="outline">阶段 {application.interviewStage}</Badge>
+            ) : null}
+            {application.status === 'interview' && application.interviewRound ? (
+              <Badge variant="outline">轮次 {application.interviewRound}</Badge>
+            ) : null}
+          </div>
+
+          {blockedReason ? (
+            <div className="bg-destructive/8 border-destructive/15 rounded-lg border px-3 py-2 text-sm">
+              <div className="text-destructive flex items-start gap-2">
+                <Icon icon="mdi:alert-octagon-outline" className="mt-0.5 h-4 w-4 shrink-0" />
+                <div className="space-y-1">
+                  <p className="font-medium">阻塞原因</p>
+                  <p className="text-foreground/80">{blockedReason}</p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {application.nextAction || actionReminderCue ? (
+            <div
+              className={cn(
+                'rounded-lg border px-3 py-2 text-sm',
+                actionReminderCue?.tone ?? 'border-primary/15 bg-primary/5 text-primary',
+              )}
             >
-              <Icon icon="mdi:pencil-outline" className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:bg-destructive size-8 hover:text-white"
-              onClick={() => onDelete(application)}
-              disabled={previewOnly}
-            >
-              <Icon icon="mdi:trash-can-outline" className="h-4 w-4" />
-            </Button>
+              <div className="flex items-start gap-2">
+                <Icon
+                  icon={actionReminderCue?.icon ?? 'mdi:arrow-right-circle-outline'}
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                />
+                <div className="space-y-1">
+                  <p className="font-medium">{actionReminderCue?.label ?? '下一步动作'}</p>
+                  {application.nextAction ? (
+                    <p className="text-foreground/80">下一步：{application.nextAction}</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-2 bg-transparent"
+            disabled={tailoring || previewOnly}
+            onClick={() => void onTailor(application)}
+          >
+            {tailoring ? (
+              <>
+                <Icon icon="lucide:loader-2" className="h-4 w-4 animate-spin" />
+                定制中...
+              </>
+            ) : (
+              <>
+                <Icon icon="mdi:sparkles" className="h-4 w-4" />
+                JD 定制简历
+              </>
+            )}
+          </Button>
+
+          {application.jdText ? (
+            <div className="bg-muted/40 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
+              <p className="line-clamp-4">JD：{application.jdText}</p>
+            </div>
+          ) : null}
+
+          {application.notes ? (
+            <div className="bg-muted/40 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
+              <p className="line-clamp-4">备注：{application.notes}</p>
+            </div>
+          ) : null}
+
+          <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span>
+              {lastContactLabel
+                ? `最近联系 ${formatLooseDate(lastContactLabel, {
+                    month: 'numeric',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}`
+                : '最近暂无联系记录'}
+            </span>
+            <span>最近更新 {formatDateLabel(application.updatedAt)}</span>
           </div>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {linkedResumeTitle ? (
-            <Badge
-              variant="outline"
-              className="border-primary/20 bg-primary/5 text-primary max-w-full min-w-0 gap-1 overflow-hidden"
-            >
-              <span className="shrink-0">简历 ·</span>
-              <span className="min-w-0 truncate">{linkedResumeTitle}</span>
-            </Badge>
-          ) : null}
-          {application.resumeId && resumeMap.get(application.resumeId) ? (
-            <Badge variant="outline">
-              {getResumeVariantLabel(resumeMap.get(application.resumeId)!.lineage.variantKind)}
-            </Badge>
-          ) : null}
-          {application.appliedAt ? (
-            <Badge variant="outline">投递于 {application.appliedAt}</Badge>
-          ) : null}
-          {application.followUpDate ? (
-            <Badge variant="outline">跟进 {application.followUpDate}</Badge>
-          ) : null}
-          {application.status === 'interview' && application.interviewStage ? (
-            <Badge variant="outline">阶段 {application.interviewStage}</Badge>
-          ) : null}
-          {application.status === 'interview' && application.interviewRound ? (
-            <Badge variant="outline">轮次 {application.interviewRound}</Badge>
-          ) : null}
-        </div>
-
-        {application.nextAction ? (
-          <div className="bg-primary/5 border-primary/15 rounded-lg border px-3 py-2 text-sm">
-            <p className="text-primary font-medium">下一步：{application.nextAction}</p>
-          </div>
-        ) : null}
-
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full gap-2 bg-transparent"
-          disabled={tailoring || previewOnly}
-          onClick={() => void onTailor(application)}
-        >
-          {tailoring ? (
-            <>
-              <Icon icon="lucide:loader-2" className="h-4 w-4 animate-spin" />
-              定制中...
-            </>
-          ) : (
-            <>
-              <Icon icon="mdi:sparkles" className="h-4 w-4" />
-              JD 定制简历
-            </>
-          )}
-        </Button>
-
-        {application.jdText ? (
-          <div className="bg-muted/40 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
-            <p className="line-clamp-4">JD：{application.jdText}</p>
-          </div>
-        ) : null}
-
-        {application.notes ? (
-          <div className="bg-muted/40 rounded-lg border px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap">
-            <p className="line-clamp-4">备注：{application.notes}</p>
-          </div>
-        ) : null}
-
-        <div className="text-muted-foreground flex items-center justify-between text-xs">
-          <span>最近更新</span>
-          <span>{formatDateLabel(application.updatedAt)}</span>
-        </div>
-      </Card>
-    </div>
-  )
+        </Card>
+      </div>
+    )
+  }
 
   const activeApplication = useMemo(
     () => applications.find((application) => application.id === activeApplicationId) ?? null,
@@ -758,7 +999,10 @@ export default function ApplicationBoard() {
                   <span className="text-sm font-medium">{card.label}</span>
                   <Icon icon={card.icon} className="h-5 w-5" />
                 </div>
-                <div className="text-2xl font-semibold">{card.value}</div>
+                <div className="space-y-1">
+                  <div className="text-2xl font-semibold">{card.value}</div>
+                  <p className="text-xs leading-relaxed opacity-80">{card.description}</p>
+                </div>
               </Card>
             ))}
           </div>
