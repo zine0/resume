@@ -15,6 +15,22 @@ pub enum ApplicationStatus {
     Rejected,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ApplicationReminderStatus {
+    Pending,
+    Completed,
+    Snoozed,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ApplicationReviewStatus {
+    Active,
+    Waiting,
+    Blocked,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct ApplicationEntry {
@@ -33,13 +49,29 @@ pub struct ApplicationEntry {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub applied_at: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contact_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub contact_channel: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_contact_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next_action: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub follow_up_date: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub reminder_status: Option<ApplicationReminderStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub interview_stage: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub interview_round: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub review_status: Option<ApplicationReviewStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blocked_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -63,13 +95,29 @@ pub struct ApplicationInput {
     #[serde(default)]
     pub applied_at: Option<String>,
     #[serde(default)]
+    pub source: Option<String>,
+    #[serde(default)]
+    pub contact_name: Option<String>,
+    #[serde(default)]
+    pub contact_channel: Option<String>,
+    #[serde(default)]
+    pub last_contact_at: Option<String>,
+    #[serde(default)]
     pub next_action: Option<String>,
     #[serde(default)]
     pub follow_up_date: Option<String>,
     #[serde(default)]
+    pub reminder_status: Option<ApplicationReminderStatus>,
+    #[serde(default)]
     pub interview_stage: Option<String>,
     #[serde(default)]
     pub interview_round: Option<String>,
+    #[serde(default)]
+    pub review_status: Option<ApplicationReviewStatus>,
+    #[serde(default)]
+    pub blocked_reason: Option<String>,
+    #[serde(default)]
+    pub result: Option<String>,
     #[serde(default)]
     pub notes: Option<String>,
 }
@@ -135,6 +183,13 @@ fn validate_application_input(input: ApplicationInput) -> Result<ApplicationInpu
         _ => (None, None),
     };
 
+    let review_status = input.review_status;
+    let blocked_reason = sanitize_optional_text(input.blocked_reason);
+    let blocked_reason = match review_status {
+        Some(ApplicationReviewStatus::Blocked) => blocked_reason,
+        _ => None,
+    };
+
     Ok(ApplicationInput {
         status: input.status,
         company,
@@ -144,10 +199,18 @@ fn validate_application_input(input: ApplicationInput) -> Result<ApplicationInpu
         resume_title: sanitize_optional_text(input.resume_title),
         url: sanitize_optional_text(input.url),
         applied_at: sanitize_optional_text(input.applied_at),
+        source: sanitize_optional_text(input.source),
+        contact_name: sanitize_optional_text(input.contact_name),
+        contact_channel: sanitize_optional_text(input.contact_channel),
+        last_contact_at: sanitize_optional_text(input.last_contact_at),
         next_action: sanitize_optional_text(input.next_action),
         follow_up_date: sanitize_optional_text(input.follow_up_date),
+        reminder_status: input.reminder_status,
         interview_stage,
         interview_round,
+        review_status,
+        blocked_reason,
+        result: sanitize_optional_text(input.result),
         notes: sanitize_optional_text(input.notes),
     })
 }
@@ -168,10 +231,18 @@ fn build_entry(
         resume_title: input.resume_title,
         url: input.url,
         applied_at: input.applied_at,
+        source: input.source,
+        contact_name: input.contact_name,
+        contact_channel: input.contact_channel,
+        last_contact_at: input.last_contact_at,
         next_action: input.next_action,
         follow_up_date: input.follow_up_date,
+        reminder_status: input.reminder_status,
         interview_stage: input.interview_stage,
         interview_round: input.interview_round,
+        review_status: input.review_status,
+        blocked_reason: input.blocked_reason,
+        result: input.result,
         created_at,
         updated_at,
         notes: input.notes,
@@ -243,7 +314,10 @@ pub fn delete_applications(app: tauri::AppHandle, ids: Vec<String>) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_application_input, ApplicationInput, ApplicationStatus};
+    use super::{
+        validate_application_input, ApplicationInput, ApplicationReminderStatus,
+        ApplicationReviewStatus, ApplicationStatus,
+    };
 
     fn valid_input() -> ApplicationInput {
         ApplicationInput {
@@ -255,10 +329,18 @@ mod tests {
             resume_title: Some(" Resume A ".to_string()),
             url: Some(" https://example.com ".to_string()),
             applied_at: Some(" 2026-04-12 ".to_string()),
+            source: Some(" Boss 直聘 ".to_string()),
+            contact_name: Some(" Alice ".to_string()),
+            contact_channel: Some(" 微信 ".to_string()),
+            last_contact_at: Some(" 2026-04-13 ".to_string()),
             next_action: Some(" send follow-up email ".to_string()),
             follow_up_date: Some(" 2026-04-18 ".to_string()),
+            reminder_status: Some(ApplicationReminderStatus::Pending),
             interview_stage: Some(" 技术面 ".to_string()),
             interview_round: Some(" 第 2 轮 ".to_string()),
+            review_status: Some(ApplicationReviewStatus::Blocked),
+            blocked_reason: Some(" waiting for recruiter reply ".to_string()),
+            result: Some(" in progress ".to_string()),
             notes: Some("  keep in touch  ".to_string()),
         }
     }
@@ -270,6 +352,10 @@ mod tests {
         assert_eq!(validated.role, "Rust Engineer");
         assert_eq!(validated.jd_text.as_deref(), Some("build desktop apps"));
         assert_eq!(validated.resume_id.as_deref(), Some("resume-1"));
+        assert_eq!(validated.source.as_deref(), Some("Boss 直聘"));
+        assert_eq!(validated.contact_name.as_deref(), Some("Alice"));
+        assert_eq!(validated.contact_channel.as_deref(), Some("微信"));
+        assert_eq!(validated.last_contact_at.as_deref(), Some("2026-04-13"));
         assert_eq!(
             validated.next_action.as_deref(),
             Some("send follow-up email")
@@ -277,6 +363,11 @@ mod tests {
         assert_eq!(validated.follow_up_date.as_deref(), Some("2026-04-18"));
         assert_eq!(validated.interview_stage.as_deref(), Some("技术面"));
         assert_eq!(validated.interview_round.as_deref(), Some("第 2 轮"));
+        assert_eq!(
+            validated.blocked_reason.as_deref(),
+            Some("waiting for recruiter reply")
+        );
+        assert_eq!(validated.result.as_deref(), Some("in progress"));
     }
 
     #[test]
@@ -303,6 +394,9 @@ mod tests {
         input.follow_up_date = Some(" ".to_string());
         input.interview_stage = Some("  ".to_string());
         input.interview_round = Some(" ".to_string());
+        input.contact_channel = Some("   ".to_string());
+        input.blocked_reason = Some(" ".to_string());
+        input.result = Some("  ".to_string());
         input.url = None;
         let validated = validate_application_input(input).expect("input should validate");
         assert!(validated.notes.is_none());
@@ -310,6 +404,9 @@ mod tests {
         assert!(validated.follow_up_date.is_none());
         assert!(validated.interview_stage.is_none());
         assert!(validated.interview_round.is_none());
+        assert!(validated.contact_channel.is_none());
+        assert!(validated.blocked_reason.is_none());
+        assert!(validated.result.is_none());
         assert!(validated.url.is_none());
     }
 
@@ -320,5 +417,17 @@ mod tests {
         let validated = validate_application_input(input).expect("input should validate");
         assert!(validated.interview_stage.is_none());
         assert!(validated.interview_round.is_none());
+    }
+
+    #[test]
+    fn validate_application_input_clears_blocked_reason_when_not_blocked() {
+        let mut input = valid_input();
+        input.review_status = Some(ApplicationReviewStatus::Waiting);
+        let validated = validate_application_input(input).expect("input should validate");
+        assert_eq!(
+            validated.review_status,
+            Some(ApplicationReviewStatus::Waiting)
+        );
+        assert!(validated.blocked_reason.is_none());
     }
 }
