@@ -44,6 +44,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import ExportButton from '@/components/export-button'
 import { getResumeLineageHint, getResumeVariantLabel } from '@/lib/resume-lineage'
 
@@ -846,7 +853,7 @@ export default function UserCenter() {
                     </TableCell>
                   </TableRow>
                   {group.items.map((it) => (
-                    <TableRow key={it.id}>
+                    <TableRow key={it.id} className="group/row">
                       <TableCell>
                         <input
                           type="checkbox"
@@ -859,7 +866,7 @@ export default function UserCenter() {
                         {it.id.slice(0, 8)}
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className="bg-muted mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-full">
+                        <div className="bg-muted ring-border/60 group-hover/row:bg-background mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-full shadow-xs ring-1 transition-all duration-200 group-hover/row:shadow-sm">
                           <img
                             src={it.resumeData.avatar || '/not-set.png'}
                             alt={it.resumeData.title}
@@ -871,17 +878,20 @@ export default function UserCenter() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div className="space-y-1">
+                        <div className="space-y-1.5 py-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">{it.resumeData.title || '未命名'}</span>
-                            <Badge variant="outline">
+                            <span className="text-sm font-semibold tracking-tight">
+                              {it.resumeData.title || '未命名'}
+                            </span>
+                            <Badge variant="outline" className="bg-background/70 text-[11px]">
                               {getResumeVariantLabel(it.lineage.variantKind)}
                             </Badge>
                           </div>
                           {getResumeLineageHint(it.lineage) ? (
-                            <p className="text-muted-foreground text-xs">
-                              {getResumeLineageHint(it.lineage)}
-                            </p>
+                            <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs leading-5">
+                              <Icon icon="mdi:source-branch" className="h-3.5 w-3.5" />
+                              <p>{getResumeLineageHint(it.lineage)}</p>
+                            </div>
                           ) : null}
                         </div>
                       </TableCell>
@@ -892,53 +902,62 @@ export default function UserCenter() {
                         {new Date(it.updatedAt).toLocaleString()}
                       </TableCell>
                       <TableCell className="w-[360px] text-right">
-                        <div className="flex flex-wrap items-center justify-end gap-2">
+                        <div className="flex flex-wrap items-center justify-end gap-1.5">
                           <Button
-                            variant="ghost"
-                            className="gap-2"
-                            onClick={() => openDetailInspector(it.id)}
-                          >
-                            <Icon icon="mdi:dock-window" className="h-4 w-4" /> 详情
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            className="gap-2"
-                            onClick={() => handleCompareWithLatest(it)}
-                          >
-                            <Icon icon="mdi:compare-horizontal" className="h-4 w-4" /> 对比
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            className="gap-2"
-                            onClick={() => navigate(`/view/${it.id}`)}
-                          >
-                            <Icon icon="mdi:eye" className="h-4 w-4" /> 查看
-                          </Button>
-                          <ExportButton resumeData={it.resumeData} variant="ghost" />
-                          <Button
-                            variant="ghost"
-                            className="gap-2"
+                            variant="secondary"
+                            size="sm"
+                            className="gap-1.5 rounded-full px-3 text-xs shadow-none"
                             onClick={() => navigate(`/edit/${it.id}`)}
                           >
                             <Icon icon="mdi:pencil" className="h-4 w-4" /> 编辑
                           </Button>
                           <Button
                             variant="ghost"
-                            className="gap-2"
-                            onClick={() => handleClone(it.id)}
+                            size="sm"
+                            className="gap-1.5 rounded-full px-3 text-xs"
+                            onClick={() => navigate(`/view/${it.id}`)}
                           >
-                            <Icon icon="mdi:content-copy" className="h-4 w-4" /> 克隆
+                            <Icon icon="mdi:eye" className="h-4 w-4" /> 查看
                           </Button>
-                          <Button
-                            variant="ghost"
-                            className="hover:bg-destructive gap-2 hover:text-white"
-                            onClick={() => {
-                              setSelected(new Set([it.id]))
-                              setConfirmOpen(true)
-                            }}
-                          >
-                            <Icon icon="mdi:delete" className="h-4 w-4" /> 删除
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground gap-1.5 rounded-full px-3 text-xs"
+                              >
+                                更多
+                                <Icon icon="mdi:chevron-down" className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-44">
+                              <DropdownMenuItem onClick={() => openDetailInspector(it.id)}>
+                                <Icon icon="mdi:dock-window" className="h-4 w-4" />
+                                详情
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleCompareWithLatest(it)}>
+                                <Icon icon="mdi:compare-horizontal" className="h-4 w-4" />
+                                对比
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <ExportButton resumeData={it.resumeData} renderMode="submenu" />
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleClone(it.id)}>
+                                <Icon icon="mdi:content-copy" className="h-4 w-4" />
+                                克隆
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => {
+                                  setSelected(new Set([it.id]))
+                                  setConfirmOpen(true)
+                                }}
+                              >
+                                <Icon icon="mdi:delete" className="h-4 w-4" />
+                                删除
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </TableCell>
                     </TableRow>

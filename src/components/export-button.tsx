@@ -8,6 +8,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useToast } from '@/hooks/use-toast'
@@ -20,6 +23,7 @@ interface ExportButtonProps {
   size?: 'default' | 'sm' | 'lg' | 'icon'
   className?: string
   showImageOptions?: boolean // 在没有预览面板时可关闭图片导出
+  renderMode?: 'button' | 'submenu'
 }
 
 async function saveWithDialog(
@@ -72,6 +76,7 @@ export function ExportButton({
   size = 'default',
   className,
   showImageOptions = true,
+  renderMode = 'button',
 }: ExportButtonProps) {
   const [isExporting, setIsExporting] = useState(false)
   const { toast } = useToast()
@@ -401,6 +406,51 @@ export function ExportButton({
     }
   }
 
+  const exportItems = (
+    <>
+      <DropdownMenuItem onClick={exportAsPDF}>
+        <Icon icon="mdi:file-pdf-box" className="mr-2 h-4 w-4" />
+        PDF 格式
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={exportAsJSON}>
+        <Icon icon="mdi:code-json" className="mr-2 h-4 w-4" />
+        JSON 格式
+      </DropdownMenuItem>
+      {showImageOptions && (
+        <>
+          <DropdownMenuItem onClick={() => exportAsImage('png')}>
+            <Icon icon="mdi:file-image" className="mr-2 h-4 w-4" />
+            PNG 格式
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => exportAsImage('jpg')}>
+            <Icon icon="mdi:file-jpg-box" className="mr-2 h-4 w-4" />
+            JPG 格式
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => exportAsImage('webp')}>
+            <Icon icon="mdi:file-image" className="mr-2 h-4 w-4" />
+            WEBP 格式
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => exportAsImage('svg')}>
+            <Icon icon="mdi:svg" className="mr-2 h-4 w-4" />
+            SVG 格式
+          </DropdownMenuItem>
+        </>
+      )}
+    </>
+  )
+
+  if (renderMode === 'submenu') {
+    return (
+      <DropdownMenuSub>
+        <DropdownMenuSubTrigger disabled={isExporting}>
+          <Icon icon="mdi:download" className="h-4 w-4" />
+          {isExporting ? '导出中...' : '导出'}
+        </DropdownMenuSubTrigger>
+        <DropdownMenuSubContent>{exportItems}</DropdownMenuSubContent>
+      </DropdownMenuSub>
+    )
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -418,36 +468,7 @@ export function ExportButton({
           {isExporting ? '导出中...' : '导出'}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={exportAsPDF}>
-          <Icon icon="mdi:file-pdf-box" className="mr-2 h-4 w-4" />
-          PDF 格式
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={exportAsJSON}>
-          <Icon icon="mdi:code-json" className="mr-2 h-4 w-4" />
-          JSON 格式
-        </DropdownMenuItem>
-        {showImageOptions && (
-          <>
-            <DropdownMenuItem onClick={() => exportAsImage('png')}>
-              <Icon icon="mdi:file-image" className="mr-2 h-4 w-4" />
-              PNG 格式
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => exportAsImage('jpg')}>
-              <Icon icon="mdi:file-jpg-box" className="mr-2 h-4 w-4" />
-              JPG 格式
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => exportAsImage('webp')}>
-              <Icon icon="mdi:file-image" className="mr-2 h-4 w-4" />
-              WEBP 格式
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => exportAsImage('svg')}>
-              <Icon icon="mdi:svg" className="mr-2 h-4 w-4" />
-              SVG 格式
-            </DropdownMenuItem>
-          </>
-        )}
-      </DropdownMenuContent>
+      <DropdownMenuContent align="end">{exportItems}</DropdownMenuContent>
     </DropdownMenu>
   )
 }
